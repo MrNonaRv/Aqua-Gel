@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../../lib/store';
 import { useCustomerNotifications } from '../../lib/notifications';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Package, User, Power, MapPin, Phone, Menu, X } from 'lucide-react';
+import { ShoppingCart, Package, User, Power, MapPin, Phone, Menu, X, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SlimGallonIcon, RoundGallonIcon } from '../../components/icons/Gallons';
 
@@ -10,7 +10,7 @@ export default function CustomerPortal() {
   useCustomerNotifications();
   const { session, setSession, inventory, setInventory, orders, setOrders, customers, setCustomers } = useStore();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<'order' | 'myorders' | 'profile'>('order');
+  const [tab, setTab] = useState<'order' | 'myorders' | 'payments' | 'profile'>('order');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const customer = customers.find(c => c.id === session?.id);
@@ -57,6 +57,7 @@ export default function CustomerPortal() {
       status: 'Pending' as const,
       total,
       paid: paymentMethod !== 'cash',
+      paidDate: paymentMethod !== 'cash' ? Date.now() : undefined,
       date: Date.now(),
       personnel: null,
       address: method === 'delivery' ? address : null,
@@ -122,6 +123,12 @@ export default function CustomerPortal() {
             <Package size={18} /> My Orders
           </button>
           <button 
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${tab === 'payments' ? 'bg-[#0a6ed1] text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+            onClick={() => { setTab('payments'); setIsSidebarOpen(false); }}
+          >
+            <CreditCard size={18} /> Payment History
+          </button>
+          <button 
             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${tab === 'profile' ? 'bg-[#0a6ed1] text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
             onClick={() => { setTab('profile'); setIsSidebarOpen(false); }}
           >
@@ -145,13 +152,13 @@ export default function CustomerPortal() {
         </div>
       </aside>
 
-      <main className="flex-1 lg:ml-64 p-6 md:p-8 lg:p-10 hide-scrollbar overflow-x-hidden pt-20 lg:pt-8 w-full max-w-[100vw]">
+      <main className="flex-1 lg:ml-64 p-4 sm:p-6 md:p-8 lg:p-10 hide-scrollbar overflow-x-hidden pt-20 lg:pt-8 pb-12 w-full max-w-[100vw]">
         {/* Mobile Header */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-brand-border flex items-center px-4 z-30 shadow-sm">
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-brand-border flex items-center px-4 z-30 shadow-sm">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-brand-dark hover:bg-brand-gray-light rounded-lg">
             <Menu size={24} />
           </button>
-          <div className="font-heading font-bold ml-2 text-brand-dark">Aqua Gel</div>
+          <div className="font-heading font-bold ml-2 text-brand-dark tracking-tight">Aqua Gel</div>
         </div>
 
         <AnimatePresence mode="wait">
@@ -168,24 +175,24 @@ export default function CustomerPortal() {
                 <motion.h1 
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="font-heading text-3xl font-bold mb-2"
+                  className="font-heading text-3xl font-bold mb-2 tracking-tight"
                 >
                   Place an Order
                 </motion.h1>
-                <p className="text-brand-gray text-lg">Select your water type, quantity, and delivery method</p>
+                <p className="text-brand-gray text-base sm:text-lg">Select your water type, quantity, and delivery method</p>
               </div>
 
               {customer && customer.unpaid > 0 && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-[#fff0f0] border border-[#ffcdd2] rounded-2xl p-5 mb-8 flex justify-between items-center"
+                  className="bg-[#fff0f0] border border-[#ffcdd2] rounded-2xl p-4 sm:p-5 mb-8 flex flex-col sm:flex-row gap-3 justify-between items-center text-center sm:text-left"
                 >
                   <div>
                     <div className="font-bold text-[#e53935] mb-1">Outstanding Balance</div>
                     <div className="text-sm text-brand-gray">Please settle your unpaid balance</div>
                   </div>
-                  <div className="font-heading text-3xl font-bold text-[#e53935]">₱{customer.unpaid}</div>
+                  <div className="font-heading text-3xl font-black text-[#e53935]">₱{customer.unpaid}</div>
                 </motion.div>
               )}
 
@@ -202,30 +209,30 @@ export default function CustomerPortal() {
                 )}
               </AnimatePresence>
 
-              <div className="bg-white rounded-3xl border border-brand-border p-8 shadow-sm">
-                <div className="font-heading text-xl font-bold mb-4 text-brand-dark">1. Choose Gallon Type</div>
-                <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-white rounded-2xl sm:rounded-3xl border border-brand-border p-4 sm:p-6 md:p-8 shadow-sm">
+                <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">1. Choose Gallon Type</div>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
                   <motion.div 
                     whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-5 cursor-pointer flex flex-col items-center justify-center transition-all ${selectedType === 'slim' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer flex flex-col items-center justify-center transition-all ${selectedType === 'slim' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setSelectedType('slim')}
                   >
-                    <SlimGallonIcon className="w-20 h-24 mb-4 drop-shadow-md" />
-                    <div className="font-heading font-bold text-lg mb-1">Slim Gallon</div>
-                    <div className="text-xl font-bold text-[#0a6ed1]">₱{inventory.priceSlim}</div>
-                    <div className="text-xs font-semibold text-brand-gray mt-2 px-2 py-1 bg-white/50 rounded-md shadow-sm">{inventory.slim} left in stock</div>
+                    <SlimGallonIcon className="w-14 h-16 sm:w-20 sm:h-24 mb-3 sm:mb-4 drop-shadow-md" />
+                    <div className="font-heading font-bold text-base sm:text-lg mb-1">Slim Gallon</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#0a6ed1]">₱{inventory.priceSlim}</div>
+                    <div className="text-[10px] sm:text-xs font-semibold text-brand-gray mt-2 px-2 py-1 bg-white/50 rounded-md shadow-sm">{inventory.slim} left</div>
                   </motion.div>
                   <motion.div 
                     whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-5 cursor-pointer flex flex-col items-center justify-center transition-all ${selectedType === 'round' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer flex flex-col items-center justify-center transition-all ${selectedType === 'round' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setSelectedType('round')}
                   >
-                    <RoundGallonIcon className="w-20 h-24 mb-4 drop-shadow-md" />
-                    <div className="font-heading font-bold text-lg mb-1">Round Gallon</div>
-                    <div className="text-xl font-bold text-[#0a6ed1]">₱{inventory.priceRound}</div>
-                    <div className="text-xs font-semibold text-brand-gray mt-2 px-2 py-1 bg-white/50 rounded-md shadow-sm">{inventory.round} left in stock</div>
+                    <RoundGallonIcon className="w-14 h-16 sm:w-20 sm:h-24 mb-3 sm:mb-4 drop-shadow-md" />
+                    <div className="font-heading font-bold text-base sm:text-lg mb-1">Round Gallon</div>
+                    <div className="text-lg sm:text-xl font-bold text-[#0a6ed1]">₱{inventory.priceRound}</div>
+                    <div className="text-[10px] sm:text-xs font-semibold text-brand-gray mt-2 px-2 py-1 bg-white/50 rounded-md shadow-sm">{inventory.round} left</div>
                   </motion.div>
                 </div>
 
@@ -251,27 +258,27 @@ export default function CustomerPortal() {
                   >+</motion.button>
                 </div>
 
-                <div className="font-heading text-xl font-bold mb-4 text-brand-dark">3. Delivery Method</div>
-                <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">3. Delivery Method</div>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-5 cursor-pointer transition-all ${method === 'delivery' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${method === 'delivery' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setMethod('delivery')}
                   >
-                    <div className="text-3xl mb-2 drop-shadow-sm">🚚</div>
-                    <div className="font-bold text-base text-brand-dark">Home Delivery</div>
-                    <div className="text-xs text-brand-gray mt-1">We deliver to your address</div>
+                    <div className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">🚚</div>
+                    <div className="font-bold text-sm sm:text-base text-brand-dark">Home Delivery</div>
+                    <div className="text-[10px] sm:text-xs text-brand-gray mt-1 leading-snug">We deliver to your address</div>
                   </motion.div>
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-5 cursor-pointer transition-all ${method === 'pickup' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${method === 'pickup' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setMethod('pickup')}
                   >
-                    <div className="text-3xl mb-2 drop-shadow-sm">🏪</div>
-                    <div className="font-bold text-base text-brand-dark">Pick-up</div>
-                    <div className="text-xs text-brand-gray mt-1">Pick up at the station</div>
+                    <div className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">🏪</div>
+                    <div className="font-bold text-sm sm:text-base text-brand-dark">Pick-up</div>
+                    <div className="text-[10px] sm:text-xs text-brand-gray mt-1 leading-snug">Pick up at the station</div>
                   </motion.div>
                 </div>
 
@@ -284,10 +291,10 @@ export default function CustomerPortal() {
                       exit={{ opacity: 0, height: 0, marginTop: 0 }}
                       className="mb-8 overflow-hidden"
                     >
-                      <label className="block text-sm font-medium mb-2 text-brand-dark">Delivery Address</label>
+                      <label className="block text-sm font-semibold mb-2 text-brand-dark">Delivery Address</label>
                       <input 
                         type="text" 
-                        className="form-control text-base py-3 shadow-inner" 
+                        className="form-control text-sm sm:text-base py-3 shadow-inner" 
                         value={address} 
                         onChange={e => setAddress(e.target.value)} 
                         placeholder="Confirm your delivery address" 
@@ -296,61 +303,61 @@ export default function CustomerPortal() {
                   )}
                 </AnimatePresence>
 
-                <div className="font-heading text-xl font-bold mb-4 text-brand-dark">4. Payment Method</div>
-                <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">4. Payment Method</div>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8">
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-4 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-2 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setPaymentMethod('cash')}
                   >
-                    <div className="font-bold text-center text-brand-dark flex flex-col items-center">
-                      <span className="text-2xl mb-2 drop-shadow-sm">💵</span>
-                      <span className="text-sm">Cash</span>
+                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
+                      <span className="text-xl sm:text-2xl mb-1.5 drop-shadow-sm">💵</span>
+                      <span className="text-xs sm:text-sm">Cash</span>
                     </div>
                   </motion.div>
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-4 cursor-pointer transition-all ${paymentMethod === 'gcash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-2 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'gcash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setPaymentMethod('gcash')}
                   >
-                    <div className="font-bold text-center text-brand-dark flex flex-col items-center">
-                      <span className="text-2xl mb-2 drop-shadow-sm">📱</span>
-                      <span className="text-sm">GCash</span>
+                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
+                      <span className="text-xl sm:text-2xl mb-1.5 drop-shadow-sm">📱</span>
+                      <span className="text-xs sm:text-sm">GCash</span>
                     </div>
                   </motion.div>
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-4 cursor-pointer transition-all ${paymentMethod === 'paymongo' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-2 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'paymongo' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setPaymentMethod('paymongo')}
                   >
-                    <div className="font-bold text-center text-brand-dark flex flex-col items-center">
-                      <span className="text-2xl mb-2 drop-shadow-sm">💳</span>
-                      <span className="text-sm">PayMongo</span>
+                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
+                      <span className="text-xl sm:text-2xl mb-1.5 drop-shadow-sm">💳</span>
+                      <span className="text-xs sm:text-sm truncate max-w-full">PayMongo</span>
                     </div>
                   </motion.div>
                 </div>
 
-                <div className="bg-[#f4f7fb] rounded-2xl p-6 mb-8 border border-brand-border shadow-inner">
-                  <div className="flex justify-between items-center text-sm font-medium text-brand-gray mb-3 bg-white p-3 rounded-lg border border-brand-border/50">
+                <div className="bg-[#f4f7fb] rounded-2xl p-4 sm:p-6 mb-8 border border-brand-border shadow-inner">
+                  <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>{selectedType === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {qty}</span>
-                    <span className="font-bold text-brand-dark">₱{total}</span>
+                    <span className="font-extrabold text-brand-dark">₱{total}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm font-medium text-brand-gray mb-4 bg-white p-3 rounded-lg border border-brand-border/50">
+                  <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>Method</span>
-                    <span className="font-bold text-brand-dark">{method === 'delivery' ? '🚚 Home Delivery' : '🏪 Pick-up'}</span>
+                    <span className="font-extrabold text-brand-dark">{method === 'delivery' ? '🚚 Delivery' : '🏪 Pick-up'}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm font-medium text-brand-gray mb-4 bg-white p-3 rounded-lg border border-brand-border/50">
+                  <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-3 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>Payment</span>
-                    <span className="font-bold text-brand-dark">
-                      {paymentMethod === 'cash' ? '💵 Cash' : paymentMethod === 'gcash' ? '📱 GCash API' : '💳 PayMongo'}
+                    <span className="font-extrabold text-brand-dark">
+                      {paymentMethod === 'cash' ? '💵 Cash' : paymentMethod === 'gcash' ? '📱 GCash' : '💳 PayMongo'}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-brand-border px-2">
-                    <span className="font-heading font-bold text-xl text-brand-dark">Total Amount</span>
-                    <span className="font-heading font-bold text-3xl text-[#0a6ed1]">₱{total}</span>
+                  <div className="flex justify-between items-center pt-4 border-t border-brand-border px-1 sm:px-2">
+                    <span className="font-heading font-bold text-base sm:text-xl text-brand-dark">Total Amount</span>
+                    <span className="font-heading font-black text-2xl sm:text-3xl text-[#0a6ed1]">₱{total}</span>
                   </div>
                 </div>
 
@@ -399,29 +406,29 @@ export default function CustomerPortal() {
                     variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
                     whileHover={{ scale: 1.01, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                     key={o.id} 
-                    className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 shadow-sm transition-shadow"
+                    className="bg-white rounded-2xl sm:rounded-3xl border border-brand-border p-4 sm:p-6 md:p-8 shadow-sm transition-all duration-200"
                   >
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
                       <div>
-                        <div className="font-heading font-bold text-xl text-brand-dark mb-1">
+                        <div className="font-heading font-black text-lg sm:text-xl text-brand-dark mb-1">
                           {o.type === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {o.qty}
                         </div>
-                        <div className="text-sm text-brand-gray">
+                        <div className="text-xs sm:text-sm text-brand-gray font-semibold">
                           {new Date(o.date).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
-                      <div className="sm:text-right">
-                        <div className="font-heading font-bold text-2xl text-brand-dark mb-2">₱{o.total}</div>
-                        <div className="flex gap-2 justify-end">
-                          <span className={`badge ${o.paid ? 'badge-paid' : 'badge-unpaid'}`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
-                          {o.paymentMethod && <span className="badge bg-brand-gray-light text-brand-gray">{o.paymentMethod.toUpperCase()}</span>}
+                      <div className="sm:text-right w-full sm:w-auto flex sm:flex-col justify-between sm:justify-start items-center sm:items-end gap-2">
+                        <div className="font-heading font-black text-xl sm:text-2xl text-brand-dark">₱{o.total}</div>
+                        <div className="flex gap-1.5 justify-end">
+                          <span className={`badge py-0.5 px-2 text-[10px] sm:text-xs font-bold leading-none ${o.paid ? 'badge-paid' : 'badge-unpaid'}`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
+                          {o.paymentMethod && <span className="badge py-0.5 px-2 text-[10px] sm:text-xs font-bold leading-none bg-brand-gray-light text-brand-gray uppercase">{o.paymentMethod}</span>}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center mb-8 relative overflow-hidden px-2">
-                      <div className="absolute top-4 left-0 w-full h-1 bg-[#f0f3f8] -z-10" />
-                      <div className="absolute top-4 left-0 h-1 bg-[#0a6ed1] -z-10 transition-all duration-500" style={{ width: `${currentStepIndex === 0 ? 10 : currentStepIndex === 1 ? 50 : 100}%` }} />
+                    <div className="flex items-center mb-8 relative overflow-hidden px-1">
+                      <div className="absolute top-[18px] left-0 w-full h-1 bg-[#f0f3f8] -z-10" />
+                      <div className="absolute top-[18px] left-0 h-1 bg-[#0a6ed1] -z-10 transition-all duration-500" style={{ width: `${currentStepIndex === 0 ? 10 : currentStepIndex === 1 ? 50 : 100}%` }} />
                       
                       {steps.map((step, i) => {
                         const isCompleted = i <= currentStepIndex;
@@ -434,7 +441,7 @@ export default function CustomerPortal() {
                             }`}>
                               {i < currentStepIndex ? '✓' : i + 1}
                             </div>
-                            <span className={`text-xs font-semibold ${isCurrent ? 'text-[#0a6ed1]' : isCompleted ? 'text-brand-dark' : 'text-brand-gray'}`}>
+                            <span className={`text-[10px] sm:text-xs text-center font-bold max-w-[70px] sm:max-w-none leading-snug ${isCurrent ? 'text-[#0a6ed1]' : isCompleted ? 'text-brand-dark' : 'text-brand-gray'}`}>
                               {step}
                             </span>
                           </div>
@@ -460,6 +467,132 @@ export default function CustomerPortal() {
                 </motion.div>
               )}
             </motion.div>
+          </motion.div>
+        )}
+
+        {tab === 'payments' && (
+          <motion.div 
+            key="payments-tab"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4 }}
+            className="max-w-4xl"
+          >
+            <div className="mb-8">
+              <h1 className="font-heading text-3xl font-bold mb-2">Payment History</h1>
+              <p className="text-brand-gray text-lg">Detailed history of your settled refilling transactions and payments</p>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-2xl border border-brand-border shadow-xs flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[#e8f5e9] text-[#2e7d32] flex items-center justify-center font-bold text-lg">
+                  ₱
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-brand-gray uppercase tracking-wider">Total Paid</div>
+                  <div className="text-2xl font-black text-brand-dark">
+                    ₱{myOrders.filter(o => o.paid).reduce((sum, o) => sum + o.total, 0)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-brand-border shadow-xs flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${customer && customer.unpaid > 0 ? 'bg-[#fff0f0] text-[#e53935]' : 'bg-[#e8f3ff] text-[#0a6ed1]'}`}>
+                  ₱
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-brand-gray uppercase tracking-wider">Outstanding Balance</div>
+                  <div className={`text-2xl font-black ${customer && customer.unpaid > 0 ? 'text-[#e53935]' : 'text-brand-dark'}`}>
+                    ₱{customer?.unpaid || 0}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-brand-border shadow-xs flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-lg">
+                  📊
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-brand-gray uppercase tracking-wider">Payments Made</div>
+                  <div className="text-2xl font-black text-brand-dark">
+                    {myOrders.filter(o => o.paid).length} Receipts
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Payments */}
+            <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 shadow-sm">
+              <h3 className="font-heading font-bold text-xl text-brand-dark mb-6">Payment Ledger</h3>
+              
+              <div className="space-y-4">
+                {myOrders.length === 0 ? (
+                  <div className="text-center py-12 text-brand-gray">
+                    <div className="text-5xl mb-3">💵</div>
+                    <p className="font-semibold">No order or payment records yet.</p>
+                    <p className="text-xs mt-1">Once you make a purchase, your payment receipts will appear here.</p>
+                  </div>
+                ) : (
+                  myOrders.map(o => (
+                    <div 
+                      key={o.id} 
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 rounded-2xl border border-brand-border hover:border-slate-300 bg-[#f4f7fb]/40 hover:bg-[#f4f7fb]/80 transition-all duration-150 gap-4"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-xs ${
+                          o.paid 
+                            ? 'bg-[#e8f5e9] text-[#2e7d32] border border-[#a5d6a7]' 
+                            : 'bg-[#fff0f0] text-[#e53935] border border-[#ffcdd2]'
+                        }`}>
+                          {o.paymentMethod === 'gcash' ? '📱' : o.paymentMethod === 'paymongo' ? '💳' : '💵'}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-brand-dark text-sm sm:text-base">
+                              {o.type === 'slim' ? 'Slim Gallon' : 'Round Gallon'} × {o.qty}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold text-brand-gray tracking-wider px-2 py-0.5 bg-slate-100 rounded-md">
+                              {o.paymentMethod === 'gcash' ? 'GCash' : o.paymentMethod === 'paymongo' ? 'PayMongo' : 'Cash'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-brand-gray font-semibold mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span>Ref: #{o.id}</span>
+                            <span className="text-slate-300">•</span>
+                            <span>Ordered: {new Date(o.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          
+                          {/* Payment details and when they paid */}
+                          {o.paid ? (
+                            <div className="text-xs text-[#2e7d32] font-bold flex items-center gap-1 mt-1">
+                              <span>🟢 Paid on: {o.paidDate ? new Date(o.paidDate).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(o.date).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-[#e53935] font-bold flex items-center gap-1 mt-1">
+                              <span>🔴 Unpaid / Payment Pending</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end border-t sm:border-t-0 pt-3 sm:pt-0 border-brand-border">
+                        <div className="font-heading font-black text-lg sm:text-xl text-brand-dark">
+                          ₱{o.total}
+                        </div>
+                        <span className={`text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                          o.paid 
+                            ? 'bg-[#e8f5e9] text-[#2e7d32]' 
+                            : 'bg-[#fff0f0] text-[#c62828] animate-pulse'
+                        }`}>
+                          {o.paid ? 'Settled' : 'Unpaid'}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </motion.div>
         )}
 

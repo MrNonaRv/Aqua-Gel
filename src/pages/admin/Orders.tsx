@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useStore, Order } from '../../lib/store';
+import { useStore, Order, Customer } from '../../lib/store';
 import { notifyStatusChange } from '../../lib/notifications';
 
 export default function Orders() {
-  const { orders, setOrders, personnel, updateCustomerBalance, customers, inventory } = useStore();
+  const { orders, setOrders, personnel, updateCustomerBalance, customers, setCustomers, inventory } = useStore();
   const [statusF, setStatusF] = useState('');
   const [paidF, setPaidF] = useState('');
   const [methodF, setMethodF] = useState('');
@@ -15,39 +15,75 @@ export default function Orders() {
   const [eStatus, setEStatus] = useState<Order['status']>('Pending');
   const [ePersonnel, setEPersonnel] = useState<string>('');
   const [ePaid, setEPaid] = useState<boolean>(false);
+  const [ePaidDate, setEPaidDate] = useState<string>('');
   const [eReturn, setEReturn] = useState<boolean>(false);
 
   // Walk-in order states
   const [showAddWalkIn, setShowAddWalkIn] = useState(false);
-  const [walkInCustomerId, setWalkInCustomerId] = useState('');
+  const [walkInCustomerId, setWalkInCustomerId] = useState('guest');
+  const [walkInGuestName, setWalkInGuestName] = useState('');
   const [walkInType, setWalkInType] = useState<'slim' | 'round'>('slim');
   const [walkInQty, setWalkInQty] = useState(1);
   const [walkInPaid, setWalkInPaid] = useState(true);
+  const [walkInPaidDate, setWalkInPaidDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   const handleOpenWalkIn = () => {
-    if (customers && customers.length > 0) {
-      setWalkInCustomerId(customers[0].id);
-    } else {
-      setWalkInCustomerId('');
-    }
+    setWalkInCustomerId('guest');
+    setWalkInGuestName('');
     setWalkInType('slim');
     setWalkInQty(1);
     setWalkInPaid(true);
+    
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    setWalkInPaidDate(`${yyyy}-${mm}-${dd}`);
+    
     setShowAddWalkIn(true);
   };
 
   const handleAddWalkIn = () => {
-    if (!walkInCustomerId) return;
-    const customer = customers.find(c => c.id === walkInCustomerId);
-    if (!customer) return;
-
+    let customerName = '';
+    let customerId = '';
     const price = walkInType === 'slim' ? inventory.priceSlim : inventory.priceRound;
     const total = walkInQty * price;
 
+    if (walkInCustomerId === 'guest') {
+      if (!walkInGuestName.trim()) return;
+      customerName = walkInGuestName.trim();
+      customerId = 'guest_' + Date.now();
+      
+      const newGuestCustomer: Customer = {
+        id: customerId,
+        name: customerName,
+        username: 'guest_' + Date.now(),
+        phone: '',
+        address: 'Walk-in Guest',
+        unpaid: walkInPaid ? 0 : total,
+        totalGallons: walkInQty,
+        isLoyal: false,
+        role: 'customer'
+      };
+      setCustomers([...customers, newGuestCustomer]);
+    } else {
+      if (!walkInCustomerId) return;
+      const customer = customers.find(c => c.id === walkInCustomerId);
+      if (!customer) return;
+      customerName = customer.name;
+      customerId = walkInCustomerId;
+    }
+
     const newOrder: Order = {
       id: 'o' + Date.now(),
-      customerId: walkInCustomerId,
-      customerName: customer.name,
+      customerId: customerId,
+      customerName: customerName,
       type: walkInType,
       qty: walkInQty,
       method: 'pickup',
@@ -55,6 +91,7 @@ export default function Orders() {
       status: 'Delivered', // Walk-in is processed instantly
       total: total,
       paid: walkInPaid,
+      paidDate: walkInPaid ? new Date(walkInPaidDate).getTime() : undefined,
       date: Date.now(),
       personnel: null,
       address: null,
@@ -63,8 +100,8 @@ export default function Orders() {
 
     setOrders([newOrder, ...orders]);
 
-    if (!walkInPaid) {
-      updateCustomerBalance(walkInCustomerId, total);
+    if (walkInCustomerId !== 'guest' && !walkInPaid) {
+      updateCustomerBalance(customerId, total);
     }
 
     setShowAddWalkIn(false);
@@ -85,13 +122,20 @@ export default function Orders() {
     setEPersonnel(o.personnel || '');
     setEPaid(o.paid);
     setEReturn(o.containerReturn);
+    
+    const dateToUse = o.paidDate ? new Date(o.paidDate) : new Date();
+    const yyyy = dateToUse.getFullYear();
+    const mm = String(dateToUse.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateToUse.getDate()).padStart(2, '0');
+    setEPaidDate(`${yyyy}-${mm}-${dd}`);
   };
 
   const handleSaveEdit = () => {
     if (!editOrder) return;
     
     const wasPaid = editOrder.paid;
-    
+    const parsedPaidDate = ePaid ? new Date(ePaidDate).getTime() : undefined;
+
     const updated = orders.map(o => {
       if (o.id === editOrder.id) {
         return {
@@ -99,6 +143,7 @@ export default function Orders() {
           status: eStatus,
           personnel: ePersonnel || null,
           paid: ePaid,
+          paidDate: parsedPaidDate,
           containerReturn: eReturn
         };
       }
@@ -122,7 +167,7 @@ export default function Orders() {
 
   const markPaid = (order: Order) => {
     if (order.paid) return;
-    const updated = orders.map(o => o.id === order.id ? { ...o, paid: true } : o);
+    const updated = orders.map(o => o.id === order.id ? { ...o, paid: true, paidDate: Date.now() } : o);
     updateCustomerBalance(order.customerId, -order.total);
     setOrders(updated);
   };
@@ -196,8 +241,17 @@ export default function Orders() {
                   <td>{o.method === 'delivery' ? '🚚 Delivery' : '🏪 Pick-up'}</td>
                   <td className="font-bold text-brand-dark">₱{o.total}</td>
                   <td>
-                    <span className={`badge ${o.paid ? 'badge-paid' : 'badge-unpaid'} mr-2`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
-                    {o.paymentMethod && <span className="text-[10px] text-brand-gray font-semibold tracking-wider">{o.paymentMethod.toUpperCase()}</span>}
+                    <div className="flex flex-col gap-0.5">
+                      <div>
+                        <span className={`badge ${o.paid ? 'badge-paid' : 'badge-unpaid'} mr-2`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
+                        {o.paymentMethod && <span className="text-[10px] text-brand-gray font-semibold tracking-wider">{o.paymentMethod.toUpperCase()}</span>}
+                      </div>
+                      {o.paid && o.paidDate && (
+                        <span className="text-[10.5px] text-brand-green font-bold mt-1">
+                          Paid: {new Date(o.paidDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td><span className={`badge ${o.status === 'Pending' ? 'badge-pending' : o.status === 'Out for Delivery' ? 'badge-delivery' : 'badge-delivered'}`}>{o.status}</span></td>
                   <td>
@@ -244,6 +298,7 @@ export default function Orders() {
                     value={walkInCustomerId} 
                     onChange={e => setWalkInCustomerId(e.target.value)}
                   >
+                    <option value="guest">👤 Walk-in Guest (No Account)</option>
                     {customers.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -253,6 +308,19 @@ export default function Orders() {
                   </div>
                 </div>
               </div>
+
+              {walkInCustomerId === 'guest' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Guest Full Name</label>
+                  <input 
+                    type="text"
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800 bg-white outline-none focus:border-slate-800 shadow-xs"
+                    placeholder="Enter guest name (e.g. B-boy Espinosa)"
+                    value={walkInGuestName}
+                    onChange={e => setWalkInGuestName(e.target.value)}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">gallon type</label>
@@ -315,6 +383,18 @@ export default function Orders() {
                   </div>
                 </div>
               </div>
+
+              {walkInPaid && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Payment Date / Date paid</label>
+                  <input 
+                    type="date"
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-810 bg-white outline-none focus:border-slate-800 shadow-xs"
+                    value={walkInPaidDate}
+                    onChange={e => setWalkInPaidDate(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="mt-8">
@@ -401,6 +481,18 @@ export default function Orders() {
                   </div>
                 </div>
               </div>
+
+              {ePaid && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Payment Date / Date paid</label>
+                  <input 
+                    type="date"
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-810 bg-white outline-none focus:border-slate-800 shadow-xs"
+                    value={ePaidDate}
+                    onChange={e => setEPaidDate(e.target.value)}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Container return</label>

@@ -33,6 +33,7 @@ export interface Order {
   personnel: string | null;
   address: string | null;
   containerReturn: boolean;
+  paidDate?: number;
 }
 
 export interface Inventory {

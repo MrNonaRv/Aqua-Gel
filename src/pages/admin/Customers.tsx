@@ -163,7 +163,12 @@ export default function Customers() {
                         </div>
                         <div className="text-right">
                           <div className="font-bold mb-0.5">₱{o.total}</div>
-                          <span className={`badge text-[10px] ${o.paid ? 'badge-paid' : 'badge-unpaid'}`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
+                          <span className={`badge text-[10px] ${o.paid ? 'badge-paid' : 'badge-unpaid'} mr-1`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
+                          {o.paid && o.paidDate && (
+                            <div className="text-[10px] text-brand-green font-semibold mt-0.5">
+                              Paid: {new Date(o.paidDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
