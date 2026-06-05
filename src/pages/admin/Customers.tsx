@@ -18,10 +18,6 @@ export default function Customers() {
     return true;
   });
 
-  const toggleLoyal = (id: string) => {
-    setCustomers(customers.map(c => c.id === id ? { ...c, isLoyal: !c.isLoyal } : c));
-  };
-
   const handleAdjustBalance = () => {
     if (!viewCust) return;
     const amt = parseFloat(adjAmount);
@@ -82,8 +78,12 @@ export default function Customers() {
                         {c.name[0]}
                       </div>
                       <div>
-                        <div className="font-bold">{c.name}</div>
-                        {c.isLoyal && <span className="badge badge-loyal text-[10px] mt-0.5">Loyal</span>}
+                        <div className="font-bold flex items-center gap-1">{c.name} {c.isLoyal && <span className="text-yellow-500" title="Loyal Customer">⭐</span>}</div>
+                        {c.isLoyal ? (
+                          <span className="badge badge-loyal text-[10px] mt-0.5">Loyal</span>
+                        ) : (
+                          <div className="text-[10px] text-brand-gray mt-0.5">{c.totalGallons} / 50 gallons</div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -99,12 +99,6 @@ export default function Customers() {
                   <td>
                     <div className="flex gap-2">
                       <button className="btn btn-secondary btn-sm" onClick={() => setViewCust(c)}>View</button>
-                      <button 
-                        className={`btn btn-sm ${c.isLoyal ? 'btn-secondary' : 'btn-primary'}`} 
-                        onClick={() => toggleLoyal(c.id)}
-                      >
-                        {c.isLoyal ? 'Remove Loyal' : 'Mark Loyal'}
-                      </button>
                     </div>
                   </td>
                 </tr>

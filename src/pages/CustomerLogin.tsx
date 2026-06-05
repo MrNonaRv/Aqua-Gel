@@ -128,9 +128,6 @@ export default function CustomerLogin() {
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="w-full md:w-[480px] bg-white flex flex-col justify-center p-10 md:p-14 relative shadow-2xl"
       >
-        <Link to="/admin/login" className="absolute top-6 right-6 text-xs text-brand-gray hover:text-brand-blue font-medium transition-colors">
-          Admin Portal →
-        </Link>
         <div className="mb-8 pl-1">
           <h2 className="font-heading font-bold text-3xl text-brand-dark mb-2">
             {tab === 'login' ? 'Welcome back' : 'Create Account'}

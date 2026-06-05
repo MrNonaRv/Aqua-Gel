@@ -483,9 +483,23 @@ export default function CustomerPortal() {
                   {customer.name[0]}
                 </div>
                 <div>
-                  <h2 className="font-heading font-bold text-2xl text-brand-dark mb-1">{customer.name}</h2>
+                  <h2 className="font-heading font-bold text-2xl text-brand-dark mb-1 flex items-center gap-2">
+                    {customer.name}
+                    {customer.isLoyal && <span title="Loyal / Regular Customer" className="text-yellow-400 drop-shadow-sm text-xl lg:text-2xl">⭐</span>}
+                  </h2>
                   <div className="text-brand-gray font-medium mb-3">@{customer.username}</div>
-                  {customer.isLoyal && <span className="badge badge-loyal py-1 px-3">Loyal / Regular Customer</span>}
+                  {customer.isLoyal ? (
+                    <span className="badge py-1 px-3 bg-gradient-to-r from-yellow-100 to-amber-50 text-yellow-800 border border-yellow-300 shadow-sm flex items-center gap-1.5 w-fit">
+                      ⭐ <span className="font-bold">Loyal / Regular Customer</span>
+                    </span>
+                  ) : (
+                    <div className="text-xs text-brand-gray font-medium max-w-[200px]">
+                      {customer.totalGallons} / 50 gallons for Loyal Status
+                      <div className="w-full h-2 bg-[#f0f3f8] rounded-full mt-1.5 overflow-hidden shadow-inner">
+                        <div className="h-full bg-gradient-to-r from-brand-blue to-brand-teal transition-all duration-1000" style={{ width: `${Math.min(100, (customer.totalGallons / 50) * 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -518,11 +532,41 @@ export default function CustomerPortal() {
                   </div>
                 </div>
               </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+
+              {myOrders.length > 0 && (
+                <div className="mt-8 pt-8 border-t border-brand-border">
+                  <h3 className="font-heading font-bold text-lg text-brand-dark mb-4 drop-shadow-sm">Recent Purchases</h3>
+                  <div className="space-y-3">
+                    {myOrders.slice(0, 3).map(o => (
+                      <div key={o.id} className="flex justify-between items-center bg-[#f4f7fb] p-4 rounded-2xl border border-transparent hover:border-brand-border transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-lg">
+                            {o.type === 'slim' ? '🔵' : '🟢'}
+                          </div>
+                          <div>
+                            <div className="font-bold text-brand-dark text-sm">{o.type === 'slim' ? 'Slim Gallon' : 'Round Gallon'} <span className="text-brand-gray font-normal">× {o.qty}</span></div>
+                            <div className="text-xs text-brand-gray">{new Date(o.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-brand-dark text-sm">₱{o.total}</div>
+                          <div className={`text-[10px] uppercase font-bold tracking-wider ${o.status === 'Delivered' ? 'text-brand-green' : o.status === 'Pending' ? 'text-brand-amber' : 'text-brand-blue'}`}>{o.status}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {myOrders.length > 3 && (
+                    <button onClick={() => setTab('myorders')} className="w-full mt-4 py-3 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5 rounded-xl transition-colors">
+                      View All Orders →
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </main>
     </div>
   );
 }

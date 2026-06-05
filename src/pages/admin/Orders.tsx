@@ -3,7 +3,7 @@ import { useStore, Order } from '../../lib/store';
 import { notifyStatusChange } from '../../lib/notifications';
 
 export default function Orders() {
-  const { orders, setOrders, personnel, updateCustomerBalance } = useStore();
+  const { orders, setOrders, personnel, updateCustomerBalance, customers, inventory } = useStore();
   const [statusF, setStatusF] = useState('');
   const [paidF, setPaidF] = useState('');
   const [methodF, setMethodF] = useState('');
@@ -16,6 +16,59 @@ export default function Orders() {
   const [ePersonnel, setEPersonnel] = useState<string>('');
   const [ePaid, setEPaid] = useState<boolean>(false);
   const [eReturn, setEReturn] = useState<boolean>(false);
+
+  // Walk-in order states
+  const [showAddWalkIn, setShowAddWalkIn] = useState(false);
+  const [walkInCustomerId, setWalkInCustomerId] = useState('');
+  const [walkInType, setWalkInType] = useState<'slim' | 'round'>('slim');
+  const [walkInQty, setWalkInQty] = useState(1);
+  const [walkInPaid, setWalkInPaid] = useState(true);
+
+  const handleOpenWalkIn = () => {
+    if (customers && customers.length > 0) {
+      setWalkInCustomerId(customers[0].id);
+    } else {
+      setWalkInCustomerId('');
+    }
+    setWalkInType('slim');
+    setWalkInQty(1);
+    setWalkInPaid(true);
+    setShowAddWalkIn(true);
+  };
+
+  const handleAddWalkIn = () => {
+    if (!walkInCustomerId) return;
+    const customer = customers.find(c => c.id === walkInCustomerId);
+    if (!customer) return;
+
+    const price = walkInType === 'slim' ? inventory.priceSlim : inventory.priceRound;
+    const total = walkInQty * price;
+
+    const newOrder: Order = {
+      id: 'o' + Date.now(),
+      customerId: walkInCustomerId,
+      customerName: customer.name,
+      type: walkInType,
+      qty: walkInQty,
+      method: 'pickup',
+      paymentMethod: 'cash',
+      status: 'Delivered', // Walk-in is processed instantly
+      total: total,
+      paid: walkInPaid,
+      date: Date.now(),
+      personnel: null,
+      address: null,
+      containerReturn: false,
+    };
+
+    setOrders([newOrder, ...orders]);
+
+    if (!walkInPaid) {
+      updateCustomerBalance(walkInCustomerId, total);
+    }
+
+    setShowAddWalkIn(false);
+  };
 
   const filtered = orders.filter(o => {
     if (statusF && o.status !== statusF) return false;
@@ -76,9 +129,17 @@ export default function Orders() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold mb-1">Orders</h1>
-        <p className="text-brand-gray">Manage all customer orders and refill transactions</p>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="font-heading text-3xl font-bold mb-1">Orders</h1>
+          <p className="text-brand-gray">Manage all customer orders and refill transactions</p>
+        </div>
+        <button
+          onClick={handleOpenWalkIn}
+          className="btn btn-primary bg-brand-blue border-brand-blue text-white px-5 py-2.5 rounded-full hover:bg-brand-blue-dark flex items-center gap-1.5 font-bold shadow-md hover:shadow-lg transition-all"
+        >
+          Add <span className="text-lg">⊕</span>
+        </button>
       </div>
 
       <div className="card">
@@ -133,24 +194,28 @@ export default function Orders() {
                   <td>{o.type === 'slim' ? '🔵 Slim' : '🟢 Round'}</td>
                   <td>{o.qty}</td>
                   <td>{o.method === 'delivery' ? '🚚 Delivery' : '🏪 Pick-up'}</td>
-                  <td className="font-bold">₱{o.total}</td>
+                  <td className="font-bold text-brand-dark">₱{o.total}</td>
                   <td>
                     <span className={`badge ${o.paid ? 'badge-paid' : 'badge-unpaid'} mr-2`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
-                    {o.paymentMethod && <span className="text-xs text-brand-gray">{o.paymentMethod.toUpperCase()}</span>}
+                    {o.paymentMethod && <span className="text-[10px] text-brand-gray font-semibold tracking-wider">{o.paymentMethod.toUpperCase()}</span>}
                   </td>
                   <td><span className={`badge ${o.status === 'Pending' ? 'badge-pending' : o.status === 'Out for Delivery' ? 'badge-delivery' : 'badge-delivered'}`}>{o.status}</span></td>
                   <td>
                     <div className="flex gap-2">
                       <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(o)}>Edit</button>
                       {!o.paid && (
-                        <button className="btn btn-sm bg-brand-green-light text-brand-green hover:bg-[#c8e6c9]" onClick={() => markPaid(o)}>Mark Paid</button>
+                        <button className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" onClick={() => markPaid(o)}>Mark Paid</button>
                       )}
                     </div>
                   </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-brand-gray">No orders found</td>
+                  <td colSpan={9} className="text-center py-12">
+                    <div className="text-4xl mb-3 opacity-30">📦</div>
+                    <div className="text-brand-dark font-medium mb-1">No orders found</div>
+                    <div className="text-xs text-brand-gray">Try adjusting your filters or search query.</div>
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -158,54 +223,216 @@ export default function Orders() {
         </div>
       </div>
 
-      {editOrder && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-lg">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-heading text-xl font-bold">Edit Order</h3>
-              <button className="text-xl text-brand-gray hover:text-brand-dark" onClick={() => setEditOrder(null)}>×</button>
-            </div>
+      {/* Walk in Order Modal */}
+      {showAddWalkIn && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2rem] border-[2.5px] border-slate-900/85 p-8 max-w-sm w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <button 
+              className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 font-bold transition-all hover:bg-slate-100" 
+              onClick={() => setShowAddWalkIn(false)}
+            >
+              ×
+            </button>
+            <h3 className="font-heading text-2xl font-black text-center mb-6 text-slate-800">Walk in Order</h3>
             
-            <div className="form-group">
-              <label>Order Status</label>
-              <select className="form-control" title="Order Status" value={eStatus} onChange={e => setEStatus(e.target.value as any)}>
-                <option value="Pending">Pending</option>
-                <option value="Out for Delivery">Out for Delivery</option>
-                <option value="Delivered">Delivered</option>
-              </select>
-            </div>
-
-            {editOrder.method === 'delivery' && (
-              <div className="form-group">
-                <label>Assign Delivery Personnel</label>
-                <select className="form-control" title="Delivery Personnel" value={ePersonnel} onChange={e => setEPersonnel(e.target.value)}>
-                  <option value="">— None —</option>
-                  {personnel.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">customer name</label>
+                <div className="relative">
+                  <select 
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800 bg-white outline-none focus:border-slate-800 appearance-none shadow-xs"
+                    value={walkInCustomerId} 
+                    onChange={e => setWalkInCustomerId(e.target.value)}
+                  >
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
+                </div>
               </div>
-            )}
 
-            <div className="form-group">
-              <label>Payment Status</label>
-              <select className="form-control" title="Payment Status" value={ePaid ? "1" : "0"} onChange={e => setEPaid(e.target.value === "1")}>
-                <option value="0">Unpaid</option>
-                <option value="1">Paid</option>
-              </select>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">gallon type</label>
+                <div className="relative">
+                  <select 
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800 bg-white outline-none focus:border-slate-800 appearance-none shadow-xs"
+                    value={walkInType} 
+                    onChange={e => setWalkInType(e.target.value as any)}
+                  >
+                    <option value="slim">slim gallon</option>
+                    <option value="round font-bold">round gallon</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider text-center">quantity</label>
+                <div className="flex items-center justify-center gap-5 py-1">
+                  <button
+                    onClick={() => setWalkInQty(q => Math.max(1, q - 1))}
+                    className="w-9 h-9 rounded-full border-2 border-slate-850 text-slate-800 flex items-center justify-center font-black text-lg hover:bg-slate-100 transition-all select-none active:scale-90"
+                    title="Decrease"
+                  >
+                    −
+                  </button>
+                  <span className="font-heading font-extrabold text-2xl text-slate-805 min-w-[20px] text-center">{walkInQty}</span>
+                  <button
+                    onClick={() => setWalkInQty(q => q + 1)}
+                    className="w-9 h-9 rounded-full border-2 border-slate-850 text-slate-800 flex items-center justify-center font-black text-lg hover:bg-slate-100 transition-all select-none active:scale-90"
+                    title="Increase"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Total</label>
+                <div className="w-full rounded-full border-[2px] border-slate-300 py-3 text-center text-lg font-black text-slate-850 bg-slate-50 shadow-inner">
+                  ₱{walkInQty * (walkInType === 'slim' ? inventory.priceSlim : inventory.priceRound)}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Payment</label>
+                <div className="relative">
+                  <select 
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800 bg-white outline-none focus:border-slate-800 appearance-none shadow-xs"
+                    value={walkInPaid ? "paid" : "unpaid"} 
+                    onChange={e => setWalkInPaid(e.target.value === "paid")}
+                  >
+                    <option value="paid">paid</option>
+                    <option value="unpaid">unpaid</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="form-group mb-8">
-              <label>Container Return</label>
-              <select className="form-control" title="Container Return" value={eReturn ? "1" : "0"} onChange={e => setEReturn(e.target.value === "1")}>
-                <option value="0">Not Returned</option>
-                <option value="1">Returned</option>
-              </select>
+            <div className="mt-8">
+              <button 
+                onClick={handleAddWalkIn}
+                className="w-full rounded-full py-4 bg-[#bce4f4] hover:bg-[#a1daf2] text-[#05445e] font-black tracking-wider hover:shadow-md active:scale-95 transition-all duration-150"
+              >
+                add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Modal */}
+      {editOrder && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2rem] border-[2.5px] border-slate-900/85 p-8 max-w-sm w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <button 
+              className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 font-bold transition-all hover:bg-slate-100" 
+              onClick={() => setEditOrder(null)}
+            >
+              ×
+            </button>
+            <h3 className="font-heading text-2xl font-black text-center mb-6 text-slate-850">
+              {editOrder.method === 'pickup' ? 'Edit walk in Order' : 'Edit Order'}
+            </h3>
+            
+            <div className="space-y-4">
+              {editOrder.method === 'delivery' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Order Status</label>
+                    <div className="relative">
+                      <select 
+                        className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800 bg-white outline-none focus:border-slate-800 appearance-none shadow-xs"
+                        value={eStatus} 
+                        onChange={e => setEStatus(e.target.value as any)}
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Out for Delivery">Out for Delivery</option>
+                        <option value="Delivered">Delivered</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Delivery Personnel</label>
+                    <div className="relative">
+                      <select 
+                        className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800 bg-white outline-none focus:border-slate-800 appearance-none shadow-xs"
+                        value={ePersonnel} 
+                        onChange={e => setEPersonnel(e.target.value)}
+                      >
+                        <option value="">— None —</option>
+                        {personnel.map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Payment status</label>
+                <div className="relative">
+                  <select 
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-850 bg-white outline-none focus:border-slate-800 appearance-none shadow-xs"
+                    value={ePaid ? "1" : "0"} 
+                    onChange={e => setEPaid(e.target.value === "1")}
+                  >
+                    <option value="1">paid</option>
+                    <option value="0">unpaid</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Container return</label>
+                <div className="relative">
+                  <select 
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-850 bg-white outline-none focus:border-slate-850 appearance-none shadow-xs"
+                    value={eReturn ? "1" : "0"} 
+                    onChange={e => setEReturn(e.target.value === "1")}
+                  >
+                    <option value="0">not returned</option>
+                    <option value="1">returned</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="flex justify-end gap-3">
-              <button className="btn btn-secondary" onClick={() => setEditOrder(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSaveEdit}>Save Changes</button>
+            <div className="mt-8 grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => setEditOrder(null)}
+                className="w-full rounded-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold tracking-wider transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSaveEdit}
+                className="w-full rounded-full py-3 bg-[#bce4f4] hover:bg-[#a9d9ee] text-[#05445e] font-black tracking-wider hover:shadow-md transition-all"
+              >
+                save changes
+              </button>
             </div>
           </div>
         </div>

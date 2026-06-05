@@ -1,6 +1,7 @@
 import { useStore } from '../../lib/store';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
+import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 
 export default function Dashboard() {
   const { orders, customers, inventory } = useStore();
@@ -15,6 +16,17 @@ export default function Dashboard() {
   
   const recentOrders = [...orders].sort((a, b) => b.date - a.date).slice(0, 5);
   const unpaidCustomers = customers.filter(c => c.unpaid > 0);
+
+  // Quick 7-day sparkline data
+  const chartData = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(todayStart);
+    d.setDate(d.getDate() - i);
+    const ds = d.getTime();
+    const de = ds + 86399999;
+    const total = orders.filter(o => o.paid && o.date >= ds && o.date <= de).reduce((s, o) => s + o.total, 0);
+    chartData.push({ name: d.toLocaleDateString('en-US', { weekday: 'short' }), total });
+  }
 
   const maxSlim = 100;
   const maxRound = 80;
@@ -35,25 +47,34 @@ export default function Dashboard() {
         variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
       >
-        <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="bg-white p-5 rounded-2xl border border-brand-border hover:shadow-md transition-shadow">
-          <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Today's Income</div>
-          <div className="font-heading text-3xl font-bold text-brand-green mb-1">₱{todayIncome.toLocaleString()}</div>
-          <div className="text-xs text-brand-gray">{todayOrders.length} orders today</div>
+        <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="bg-white p-5 rounded-2xl border border-brand-border hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="relative z-10">
+            <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Today's Income</div>
+            <div className="font-heading text-4xl font-bold text-brand-green mb-1 drop-shadow-sm">₱{todayIncome.toLocaleString()}</div>
+            <div className="text-xs text-brand-gray font-medium">{todayOrders.length} orders today</div>
+          </div>
+          <div className="absolute inset-x-0 bottom-0 h-24 opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <Bar dataKey="total" fill="#2e7d32" radius={[4, 4, 0, 0]} isAnimationActive={true} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="bg-white p-5 rounded-2xl border border-brand-border hover:shadow-md transition-shadow">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Pending Orders</div>
-          <div className="font-heading text-3xl font-bold text-brand-amber mb-1">{pendingOrders}</div>
-          <div className="text-xs text-brand-gray">Awaiting processing</div>
+          <div className="font-heading text-4xl font-bold text-brand-amber mb-1 drop-shadow-sm">{pendingOrders}</div>
+          <div className="text-xs text-brand-gray font-medium">Awaiting processing</div>
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="bg-white p-5 rounded-2xl border border-brand-border hover:shadow-md transition-shadow">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Total Unpaid</div>
-          <div className="font-heading text-3xl font-bold text-brand-red mb-1">₱{totalUnpaid.toLocaleString()}</div>
-          <div className="text-xs text-brand-gray">{unpaidCustomers.length} customers</div>
+          <div className="font-heading text-4xl font-bold text-brand-red mb-1 drop-shadow-sm">₱{totalUnpaid.toLocaleString()}</div>
+          <div className="text-xs text-brand-gray font-medium">{unpaidCustomers.length} customers</div>
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="bg-white p-5 rounded-2xl border border-brand-border hover:shadow-md transition-shadow">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Total Customers</div>
-          <div className="font-heading text-3xl font-bold text-brand-dark mb-1">{customers.length}</div>
-          <div className="text-xs text-brand-gray">{customers.filter(c => c.isLoyal).length} loyal/regular</div>
+          <div className="font-heading text-4xl font-bold text-brand-dark mb-1 drop-shadow-sm">{customers.length}</div>
+          <div className="text-xs text-brand-gray font-medium">{customers.filter(c => c.isLoyal).length} loyal/regular</div>
         </motion.div>
       </motion.div>
 

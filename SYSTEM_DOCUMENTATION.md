@@ -13,6 +13,7 @@ The following were the minimum software and hardware specifications for the syst
 11. Development Environment: Visual Studio Code, Git, Vite configuration builder
 12. Payment Gateway Integration: API for secure digital payments and unpaid balance settlements (e.g., GCash API, PayMongo - specific choice to be finalized during coding)
 13. Deployment Environment: Vercel (Configured with `vercel.json` for React Client-Side Routing)
+14. Customer Loyalty System: Automatic progress tracking towards a 50-gallon goal, awarding "Loyal/Regular" status and displaying a star icon.
 
 Coding Phase
 The coding phase involved the development of the source code for the client-facing interface (Customer Portal) and the administrative dashboard (Admin Portal) of the Aqua Gel Water Station Management System.

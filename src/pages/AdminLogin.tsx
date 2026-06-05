@@ -72,9 +72,6 @@ export default function AdminLogin() {
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="w-full md:w-[480px] bg-white flex flex-col justify-center p-10 md:p-14 relative shadow-2xl"
       >
-        <Link to="/" className="absolute top-6 left-6 text-xs text-brand-gray hover:text-brand-blue font-medium transition-colors">
-          ← Customer Portal
-        </Link>
         <div className="mb-8 pl-1 text-center">
           <h2 className="font-heading font-bold text-3xl text-brand-dark mb-2">
             Admin Login

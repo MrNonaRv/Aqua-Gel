@@ -14,6 +14,7 @@ export interface Customer extends User {
   phone: string;
   address: string;
   unpaid: number;
+  totalGallons: number;
   isLoyal: boolean;
 }
 
@@ -60,9 +61,9 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const SEED_CUSTOMERS: Customer[] = [
-  { id: 'c1', name: 'Maria Santos', username: 'maria', password: 'maria123', phone: '09171234567', address: 'Brgy. Poblacion, Numancia, Aklan', unpaid: 150, isLoyal: true, role: 'customer' },
-  { id: 'c2', name: 'Jose Reyes', username: 'jose', password: 'jose123', phone: '09281234567', address: 'Purok 3, Numancia, Aklan', unpaid: 0, isLoyal: true, role: 'customer' },
-  { id: 'c3', name: 'Ana Cruz', username: 'ana', password: 'ana123', phone: '09391234567', address: 'Brgy. Union, Numancia, Aklan', unpaid: 75, isLoyal: false, role: 'customer' },
+  { id: 'c1', name: 'Maria Santos', username: 'maria', password: 'maria123', phone: '09171234567', address: 'Brgy. Poblacion, Numancia, Aklan', unpaid: 150, totalGallons: 5, isLoyal: false, role: 'customer' },
+  { id: 'c2', name: 'Jose Reyes', username: 'jose', password: 'jose123', phone: '09281234567', address: 'Purok 3, Numancia, Aklan', unpaid: 0, totalGallons: 3, isLoyal: false, role: 'customer' },
+  { id: 'c3', name: 'Ana Cruz', username: 'ana', password: 'ana123', phone: '09391234567', address: 'Brgy. Union, Numancia, Aklan', unpaid: 75, totalGallons: 3, isLoyal: false, role: 'customer' },
 ];
 
 const now = Date.now();
@@ -138,10 +139,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setCustomers(newCustomers);
   };
 
+  const customersWithLoyalty = React.useMemo(() => {
+    return customers.map(c => {
+      const deliveredQty = orders
+        .filter(o => o.customerId === c.id && o.status === 'Delivered')
+        .reduce((sum, o) => sum + o.qty, 0);
+      return {
+        ...c,
+        totalGallons: deliveredQty,
+        isLoyal: deliveredQty >= 50
+      };
+    });
+  }, [customers, orders]);
+
   return (
     <StoreContext.Provider value={{
       session, setSession,
-      customers, setCustomers,
+      customers: customersWithLoyalty, setCustomers,
       orders, setOrders,
       inventory, setInventory,
       personnel, setPersonnel,
