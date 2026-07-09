@@ -108,7 +108,7 @@ export default function CustomerLogin() {
           transition={{ duration: 0.8, delay: 0.6 }}
           className="flex flex-col gap-4 z-10 text-white/90"
         >
-          {['Online ordering', 'Real-time delivery tracking', 'Detailed income reports', 'Balance monitoring', 'Inventory management'].map((txt, i) => (
+          {['Online ordering', 'Detailed income reports', 'Balance monitoring', 'Inventory management'].map((txt, i) => (
             <motion.div 
               key={i} 
               initial={{ opacity: 0, x: -10 }}

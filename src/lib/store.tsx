@@ -25,8 +25,8 @@ export interface Order {
   type: 'slim' | 'round';
   qty: number;
   method: 'delivery' | 'pickup';
-  paymentMethod?: 'cash' | 'gcash' | 'paymongo';
-  status: 'Pending' | 'Out for Delivery' | 'Delivered';
+  paymentMethod?: 'cash' | 'gcash';
+  status: 'Pending' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
   total: number;
   paid: boolean;
   date: number;

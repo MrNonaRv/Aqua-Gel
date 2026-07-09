@@ -19,7 +19,7 @@ export default function CustomerPortal() {
   const [selectedType, setSelectedType] = useState<'slim' | 'round'>('slim');
   const [qty, setQty] = useState(1);
   const [method, setMethod] = useState<'delivery' | 'pickup'>('delivery');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash' | 'paymongo'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash'>('cash');
   const [address, setAddress] = useState(customer?.address || '');
   const [orderSuccess, setOrderSuccess] = useState('');
 
@@ -73,7 +73,7 @@ export default function CustomerPortal() {
     }
 
     if (paymentMethod !== 'cash') {
-      setOrderSuccess(`✅ Payment successful via ${paymentMethod === 'gcash' ? 'GCash' : 'PayMongo'}. Order placed! Total: ₱${total}. Status: Pending.`);
+      setOrderSuccess(`✅ Payment successful via GCash. Order placed! Total: ₱${total}. Status: Pending.`);
     } else {
       setOrderSuccess(`✅ Order placed successfully! Total: ₱${total}. Status: Pending.`);
     }
@@ -304,38 +304,27 @@ export default function CustomerPortal() {
                 </AnimatePresence>
 
                 <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">4. Payment Method</div>
-                <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-2 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setPaymentMethod('cash')}
                   >
                     <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
-                      <span className="text-xl sm:text-2xl mb-1.5 drop-shadow-sm">💵</span>
-                      <span className="text-xs sm:text-sm">Cash</span>
+                      <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">💵</span>
+                      <span className="text-sm sm:text-base">Cash</span>
                     </div>
                   </motion.div>
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-2 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'gcash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${paymentMethod === 'gcash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setPaymentMethod('gcash')}
                   >
                     <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
-                      <span className="text-xl sm:text-2xl mb-1.5 drop-shadow-sm">📱</span>
-                      <span className="text-xs sm:text-sm">GCash</span>
-                    </div>
-                  </motion.div>
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-2 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'paymongo' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setPaymentMethod('paymongo')}
-                  >
-                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
-                      <span className="text-xl sm:text-2xl mb-1.5 drop-shadow-sm">💳</span>
-                      <span className="text-xs sm:text-sm truncate max-w-full">PayMongo</span>
+                      <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">📱</span>
+                      <span className="text-sm sm:text-base">GCash</span>
                     </div>
                   </motion.div>
                 </div>
@@ -352,7 +341,7 @@ export default function CustomerPortal() {
                   <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-3 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>Payment</span>
                     <span className="font-extrabold text-brand-dark">
-                      {paymentMethod === 'cash' ? '💵 Cash' : paymentMethod === 'gcash' ? '📱 GCash' : '💳 PayMongo'}
+                      {paymentMethod === 'cash' ? '💵 Cash' : '📱 GCash'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-brand-border px-1 sm:px-2">
@@ -398,6 +387,7 @@ export default function CustomerPortal() {
               className="flex flex-col gap-6"
             >
               {myOrders.length > 0 ? myOrders.map((o, index) => {
+                const isCancelled = o.status === 'Cancelled';
                 const steps = ['Pending', 'Out for Delivery', 'Delivered'];
                 const currentStepIndex = steps.indexOf(o.status);
 
@@ -406,7 +396,7 @@ export default function CustomerPortal() {
                     variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
                     whileHover={{ scale: 1.01, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                     key={o.id} 
-                    className="bg-white rounded-2xl sm:rounded-3xl border border-brand-border p-4 sm:p-6 md:p-8 shadow-sm transition-all duration-200"
+                    className={`bg-white rounded-2xl sm:rounded-3xl border ${isCancelled ? 'border-red-200 bg-red-50/30' : 'border-brand-border'} p-4 sm:p-6 md:p-8 shadow-sm transition-all duration-200`}
                   >
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
                       <div>
@@ -426,28 +416,34 @@ export default function CustomerPortal() {
                       </div>
                     </div>
 
-                    <div className="flex items-center mb-8 relative overflow-hidden px-1">
-                      <div className="absolute top-[18px] left-0 w-full h-1 bg-[#f0f3f8] -z-10" />
-                      <div className="absolute top-[18px] left-0 h-1 bg-[#0a6ed1] -z-10 transition-all duration-500" style={{ width: `${currentStepIndex === 0 ? 10 : currentStepIndex === 1 ? 50 : 100}%` }} />
-                      
-                      {steps.map((step, i) => {
-                        const isCompleted = i <= currentStepIndex;
-                        const isCurrent = i === currentStepIndex;
+                    {isCancelled ? (
+                      <div className="flex items-center justify-center p-6 bg-red-50 text-red-600 rounded-xl font-bold mb-8 border border-red-100">
+                        🚫 Order Cancelled
+                      </div>
+                    ) : (
+                      <div className="flex items-center mb-8 relative overflow-hidden px-1">
+                        <div className="absolute top-[18px] left-0 w-full h-1 bg-[#f0f3f8] -z-10" />
+                        <div className="absolute top-[18px] left-0 h-1 bg-[#0a6ed1] -z-10 transition-all duration-500" style={{ width: `${currentStepIndex === 0 ? 10 : currentStepIndex === 1 ? 50 : 100}%` }} />
                         
-                        return (
-                          <div key={step} className="flex-1 flex flex-col items-center">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm mb-3 transition-colors ${
-                              isCompleted ? 'bg-[#0a6ed1] text-white shadow-md' : 'bg-[#f0f3f8] text-brand-gray'
-                            }`}>
-                              {i < currentStepIndex ? '✓' : i + 1}
+                        {steps.map((step, i) => {
+                          const isCompleted = i <= currentStepIndex;
+                          const isCurrent = i === currentStepIndex;
+                          
+                          return (
+                            <div key={step} className="flex-1 flex flex-col items-center">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm mb-3 transition-colors ${
+                                isCompleted ? 'bg-[#0a6ed1] text-white shadow-md' : 'bg-[#f0f3f8] text-brand-gray'
+                              }`}>
+                                {i < currentStepIndex ? '✓' : i + 1}
+                              </div>
+                              <span className={`text-[10px] sm:text-xs text-center font-bold max-w-[70px] sm:max-w-none leading-snug ${isCurrent ? 'text-[#0a6ed1]' : isCompleted ? 'text-brand-dark' : 'text-brand-gray'}`}>
+                                {step}
+                              </span>
                             </div>
-                            <span className={`text-[10px] sm:text-xs text-center font-bold max-w-[70px] sm:max-w-none leading-snug ${isCurrent ? 'text-[#0a6ed1]' : isCompleted ? 'text-brand-dark' : 'text-brand-gray'}`}>
-                              {step}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap gap-4 pt-6 border-t border-[#f0f3f8] text-sm text-brand-gray font-medium">
                       <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-brand-gray-light flex flex-center items-center justify-center">🚚</div> {o.method === 'delivery' ? 'Home Delivery' : 'Pick-up'}</div>
@@ -546,7 +542,7 @@ export default function CustomerPortal() {
                             ? 'bg-[#e8f5e9] text-[#2e7d32] border border-[#a5d6a7]' 
                             : 'bg-[#fff0f0] text-[#e53935] border border-[#ffcdd2]'
                         }`}>
-                          {o.paymentMethod === 'gcash' ? '📱' : o.paymentMethod === 'paymongo' ? '💳' : '💵'}
+                          {o.paymentMethod === 'gcash' ? '📱' : '💵'}
                         </div>
                         <div>
                           <div className="flex items-center gap-2 mb-1">
@@ -554,7 +550,7 @@ export default function CustomerPortal() {
                               {o.type === 'slim' ? 'Slim Gallon' : 'Round Gallon'} × {o.qty}
                             </span>
                             <span className="text-[10px] uppercase font-bold text-brand-gray tracking-wider px-2 py-0.5 bg-slate-100 rounded-md">
-                              {o.paymentMethod === 'gcash' ? 'GCash' : o.paymentMethod === 'paymongo' ? 'PayMongo' : 'Cash'}
+                              {o.paymentMethod === 'gcash' ? 'GCash' : 'Cash'}
                             </span>
                           </div>
                           <div className="text-xs text-brand-gray font-semibold mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
