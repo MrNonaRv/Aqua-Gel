@@ -19,7 +19,7 @@ export default function CustomerPortal() {
   const [selectedType, setSelectedType] = useState<'slim' | 'round'>('slim');
   const [qty, setQty] = useState(1);
   const [method, setMethod] = useState<'delivery' | 'pickup'>('delivery');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'qrph' | 'gcash'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash'>('cash');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [address, setAddress] = useState(customer?.address || '');
   const [orderSuccess, setOrderSuccess] = useState('');
@@ -45,6 +45,18 @@ export default function CustomerPortal() {
     const orderId = params.get('order_id');
 
     if (isSuccess === 'true' && orderId) {
+      if (orderId.startsWith('balance_')) {
+        // Find customer and update balance
+        const custId = orderId.split('_')[1];
+        setCustomers(customers.map(c => c.id === custId ? { ...c, unpaid: 0 } : c));
+        // Mark all unpaid orders for this customer as paid
+        setOrders(orders.map(o => (o.customerId === custId && !o.paid) ? { ...o, paid: true, paidDate: Date.now() } : o));
+        setOrderSuccess('✅ Outstanding balance successfully paid via GCash!');
+        setTab('paymenthistory');
+        setTimeout(() => setOrderSuccess(''), 5000);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
       // Find order and mark as paid
       const order = orders.find(o => o.id === orderId);
       if (order && !order.paid) {
@@ -59,6 +71,44 @@ export default function CustomerPortal() {
     }
   }, [orders, setOrders]);
 
+  
+  const payOutstandingBalance = async () => {
+    if (!customer || customer.unpaid <= 0) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      const orderId = `balance_${customer.id}_${Date.now()}`;
+      const response = await fetch('/api/paymongo/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: customer.unpaid,
+          description: `Outstanding Balance Settlement`,
+          orderId: orderId,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.checkoutUrl) {
+        const newWindow = window.open(data.checkoutUrl, '_blank');
+        if (!newWindow) {
+          alert('Popup blocked! Please allow popups to proceed to payment.');
+        } else {
+          setOrderSuccess('Payment window opened. Please complete your transaction securely.');
+        }
+      } else {
+        alert('Failed to initialize payment gateway: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      alert('Payment initialization failed.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
   const placeOrder = async () => {
     const stock = inventory[selectedType];
     if (stock < qty) {
@@ -70,14 +120,9 @@ export default function CustomerPortal() {
       return;
     }
 
-    if ((paymentMethod === 'qrph' || paymentMethod === 'gcash') && !referenceNumber.trim()) {
-      alert(`Please enter your ${paymentMethod === 'gcash' ? 'GCash' : 'QRPh'} Reference Number.`);
-      return;
-    }
-
     const orderId = 'o' + Date.now();
 
-    if (paymentMethod === 'paymongo') {
+    if (paymentMethod === 'gcash') {
       setIsProcessingPayment(true);
       try {
         // Create pending unpaid order first
@@ -117,8 +162,17 @@ export default function CustomerPortal() {
         const data = await response.json();
         
         if (data.checkoutUrl) {
-          // Redirect to PayMongo secure checkout
-          window.location.href = data.checkoutUrl;
+          // Save the checkout URL to the order so it can be resumed
+          setOrders(prev => prev.map(o => o.id === orderId ? { ...o, checkoutUrl: data.checkoutUrl } : o));
+
+          // PayMongo blocks iframe embedding, so we open in a new tab
+          const newWindow = window.open(data.checkoutUrl, '_blank');
+          if (!newWindow) {
+            alert('Popup blocked! Please click "Complete Payment" in your orders list to pay via GCash.');
+          } else {
+            setOrderSuccess('Payment window opened. Please complete your transaction securely.');
+          }
+          setTab('myorders');
           return;
         } else {
           alert('Failed to initialize payment gateway: ' + (data.error || 'Unknown error'));
@@ -138,6 +192,8 @@ export default function CustomerPortal() {
       return;
     }
 
+
+
     const newOrder = {
       id: orderId,
       customerId: session!.id,
@@ -146,7 +202,7 @@ export default function CustomerPortal() {
       qty,
       method,
       paymentMethod,
-      referenceNumber: (paymentMethod === 'qrph' || paymentMethod === 'gcash') ? referenceNumber.trim() : undefined,
+      referenceNumber: undefined,
       status: 'Pending' as const,
       total,
       paid: false, // All manual payments are unpaid until verified/collected
@@ -296,275 +352,182 @@ export default function CustomerPortal() {
                     <div className="font-bold text-[#e53935] mb-1">Outstanding Balance</div>
                     <div className="text-sm text-brand-gray">Please settle your unpaid balance</div>
                   </div>
-                  <div className="font-heading text-3xl font-black text-[#e53935]">₱{customer.unpaid}</div>
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="font-heading text-3xl font-black text-[#e53935]">₱{customer.unpaid}</div>
+                    <button 
+                      onClick={payOutstandingBalance}
+                      disabled={isProcessingPayment}
+                      className="bg-[#e53935] text-white px-4 py-2 rounded-xl text-sm font-bold shadow hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Pay via GCash
+                    </button>
+                  </div>
                 </motion.div>
               )}
 
-              <AnimatePresence>
-                {orderSuccess && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                    animate={{ opacity: 1, height: 'auto', marginBottom: 32 }}
-                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                    className="bg-[#e8f5e9] border border-[#a5d6a7] text-[#2e7d32] px-5 py-4 rounded-xl font-medium overflow-hidden"
-                  >
-                    {orderSuccess}
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
-              <div className="bg-white rounded-2xl sm:rounded-3xl border border-brand-border p-4 sm:p-6 md:p-8 shadow-sm">
-                <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">1. Choose Gallon Type</div>
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
-                  <motion.div 
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer flex flex-col items-center justify-center transition-all ${selectedType === 'slim' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setSelectedType('slim')}
-                  >
-                    <SlimGallonIcon className="w-14 h-16 sm:w-20 sm:h-24 mb-3 sm:mb-4 drop-shadow-md" />
-                    <div className="font-heading font-bold text-base sm:text-lg mb-1">Slim Gallon</div>
-                    <div className="text-lg sm:text-xl font-bold text-[#0a6ed1]">₱{inventory.priceSlim}</div>
-                    <div className="text-[10px] sm:text-xs font-semibold text-brand-gray mt-2 px-2 py-1 bg-white/50 rounded-md shadow-sm">{inventory.slim} left</div>
-                  </motion.div>
-                  <motion.div 
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer flex flex-col items-center justify-center transition-all ${selectedType === 'round' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setSelectedType('round')}
-                  >
-                    <RoundGallonIcon className="w-14 h-16 sm:w-20 sm:h-24 mb-3 sm:mb-4 drop-shadow-md" />
-                    <div className="font-heading font-bold text-base sm:text-lg mb-1">Round Gallon</div>
-                    <div className="text-lg sm:text-xl font-bold text-[#0a6ed1]">₱{inventory.priceRound}</div>
-                    <div className="text-[10px] sm:text-xs font-semibold text-brand-gray mt-2 px-2 py-1 bg-white/50 rounded-md shadow-sm">{inventory.round} left</div>
-                  </motion.div>
-                </div>
-
-                <div className="font-heading text-xl font-bold mb-4 text-brand-dark">2. Quantity</div>
-                <div className="flex items-center gap-6 mb-8">
-                  <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="w-12 h-12 rounded-full border-2 border-brand-border flex items-center justify-center text-2xl text-brand-gray hover:text-[#0a6ed1] hover:border-[#0a6ed1] hover:bg-[#e8f3ff] transition-colors"
-                    onClick={() => changeQty(-1)}
-                  >−</motion.button>
-                  <motion.div 
-                    key={qty}
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="font-heading text-4xl font-bold w-12 text-center text-brand-dark"
-                  >{qty}</motion.div>
-                  <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="w-12 h-12 rounded-full border-2 border-brand-border flex items-center justify-center text-2xl text-brand-gray hover:text-[#0a6ed1] hover:border-[#0a6ed1] hover:bg-[#e8f3ff] transition-colors"
-                    onClick={() => changeQty(1)}
-                  >+</motion.button>
-                </div>
-
-                <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">3. Delivery Method</div>
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${method === 'delivery' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setMethod('delivery')}
-                  >
-                    <div className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">🚚</div>
-                    <div className="font-bold text-sm sm:text-base text-brand-dark">Home Delivery</div>
-                    <div className="text-[10px] sm:text-xs text-brand-gray mt-1 leading-snug">We deliver to your address</div>
-                  </motion.div>
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${method === 'pickup' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setMethod('pickup')}
-                  >
-                    <div className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">🏪</div>
-                    <div className="font-bold text-sm sm:text-base text-brand-dark">Pick-up</div>
-                    <div className="text-[10px] sm:text-xs text-brand-gray mt-1 leading-snug">Pick up at the station</div>
-                  </motion.div>
-                </div>
-
-                <AnimatePresence>
-                  {method === 'delivery' && (
+              <div className="space-y-10">
+                <div>
+                  <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">1. Water Type</div>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <motion.div 
-                      key="address-field"
-                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                      animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                      className="mb-8 overflow-hidden"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`border-2 rounded-2xl p-4 sm:p-5 cursor-pointer transition-all ${selectedType === 'slim' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                      onClick={() => setSelectedType('slim')}
                     >
-                      <label className="block text-sm font-semibold mb-2 text-brand-dark">Delivery Address</label>
-                      <input 
-                        type="text" 
-                        className="form-control text-sm sm:text-base py-3 shadow-inner" 
-                        value={address} 
-                        onChange={e => setAddress(e.target.value)} 
-                        placeholder="Confirm your delivery address" 
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">4. Payment Method</div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-8">
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setPaymentMethod('cash')}
-                  >
-                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
-                      <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">💵</span>
-                      <span className="text-xs sm:text-sm">Cash</span>
-                    </div>
-                  </motion.div>
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'qrph' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setPaymentMethod('qrph')}
-                  >
-                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
-                      <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">📷</span>
-                      <span className="text-xs sm:text-sm">Scan to Pay</span>
-                    </div>
-                  </motion.div>
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'gcash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setPaymentMethod('gcash')}
-                  >
-                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
-                      <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">📱</span>
-                      <span className="text-xs sm:text-sm">GCash Number</span>
-                    </div>
-                  </motion.div>
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'paymongo' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
-                    onClick={() => setPaymentMethod('paymongo')}
-                  >
-                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
-                      <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">💳</span>
-                      <span className="text-xs sm:text-sm text-center">PayMongo (E-Wallet)</span>
-                    </div>
-                  </motion.div>
-                </div>
-
-                <AnimatePresence>
-                  {paymentMethod === 'qrph' && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                      animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                      className="mb-8 overflow-hidden"
-                    >
-                      <div className="bg-[#e8f3ff] border-2 border-[#0a6ed1]/30 rounded-2xl p-5 mb-4 text-center flex flex-col items-center justify-center">
-                        <h4 className="font-bold text-brand-dark mb-1">Pay via QRPh</h4>
-                        <p className="text-sm text-brand-gray mb-4">Scan the QR code below using your e-wallet or banking app.</p>
-                        
-                        <div className="bg-white p-4 rounded-xl border border-brand-border shadow-sm mb-4 inline-block">
-                          {settings.qrCodeUrl ? (
-                            <img src={settings.qrCodeUrl} alt="QR Code" className="w-48 h-48 sm:w-64 sm:h-64 object-contain" />
-                          ) : (
-                            <svg className="w-32 h-32 text-brand-dark opacity-80" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-3 0h2v2h-2v-2zm3 3h3v2h-3v-2zm-3 0h2v2h-2v-2zm3 3h3v2h-3v-2zm-3 0h2v2h-2v-2zm0-9h5v2h-5v-2z"/>
-                            </svg>
-                          )}
+                      <div className="flex flex-col items-center justify-center text-center gap-3">
+                        <div className={`${selectedType === 'slim' ? 'text-[#0a6ed1]' : 'text-brand-gray'} transition-colors`}>
+                          <SlimGallonIcon className="w-10 h-10 sm:w-12 sm:h-12" />
                         </div>
-
-                        <div className="text-center mb-2">
-                          <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">Account Name</div>
-                          <div className="font-bold text-brand-dark">{settings.gcashName}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">GCash Number</div>
-                          <div className="font-mono font-bold text-lg text-brand-dark">{settings.gcashNumber}</div>
+                        <div>
+                          <div className="font-bold text-brand-dark text-sm sm:text-base">Slim Gallon</div>
+                          <div className="text-brand-blue font-black mt-1">₱{inventory.priceSlim}</div>
                         </div>
                       </div>
-                      
-                      <label className="block text-sm font-semibold mb-2 text-brand-dark">Reference Number (Required)</label>
-                      <input 
-                        type="text" 
-                        className="form-control text-sm sm:text-base py-3 shadow-inner font-mono tracking-wider" 
-                        value={referenceNumber} 
-                        onChange={e => setReferenceNumber(e.target.value)} 
-                        placeholder="e.g. 1029384756" 
-                      />
                     </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <AnimatePresence>
-                  {paymentMethod === 'gcash' && (
                     <motion.div 
-                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                      animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                      className="mb-8 overflow-hidden"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`border-2 rounded-2xl p-4 sm:p-5 cursor-pointer transition-all ${selectedType === 'round' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                      onClick={() => setSelectedType('round')}
                     >
-                      <div className="bg-[#e8f3ff] border-2 border-[#0a6ed1]/30 rounded-2xl p-5 mb-4 text-center">
-                        <h4 className="font-bold text-brand-dark mb-1">Pay via GCash Number</h4>
-                        <p className="text-sm text-brand-gray mb-4">Send exactly ₱{total} to the GCash number below.</p>
-                        
-                        <div className="bg-white px-6 py-4 rounded-xl border border-brand-border shadow-sm inline-block text-left w-full sm:w-auto">
-                          <div className="mb-2">
-                            <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">Send Amount</div>
-                            <div className="font-mono font-bold text-xl text-brand-blue">₱ {total}.00</div>
-                          </div>
-                          <div className="mb-2">
-                            <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">Account Name</div>
-                            <div className="font-bold text-brand-dark">{settings.gcashName}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">GCash Number</div>
-                            <div className="font-mono font-bold text-lg text-brand-dark">{settings.gcashNumber}</div>
-                          </div>
+                      <div className="flex flex-col items-center justify-center text-center gap-3">
+                        <div className={`${selectedType === 'round' ? 'text-[#0a6ed1]' : 'text-brand-gray'} transition-colors`}>
+                          <RoundGallonIcon className="w-10 h-10 sm:w-12 sm:h-12" />
                         </div>
-                        
-                        <div className="mt-4 text-xs text-brand-gray font-medium">
-                          After sending, enter your Reference Number below.
+                        <div>
+                          <div className="font-bold text-brand-dark text-sm sm:text-base">Round Gallon</div>
+                          <div className="text-brand-blue font-black mt-1">₱{inventory.priceRound}</div>
                         </div>
                       </div>
-                      
-                      <label className="block text-sm font-semibold mb-2 text-brand-dark">Reference Number (Required)</label>
-                      <input 
-                        type="text" 
-                        className="form-control text-sm sm:text-base py-3 shadow-inner font-mono tracking-wider" 
-                        value={referenceNumber} 
-                        onChange={e => setReferenceNumber(e.target.value)} 
-                        placeholder="e.g. 1029384756" 
-                      />
                     </motion.div>
-                  )}
-                </AnimatePresence>
+                  </div>
+                </div>
 
-                <AnimatePresence>
-                  {paymentMethod === 'paymongo' && (
+                <div>
+                  <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">2. Quantity</div>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center border-2 border-brand-border rounded-xl bg-white shadow-sm overflow-hidden">
+                      <button 
+                        className="px-4 py-3 sm:px-5 sm:py-4 hover:bg-brand-gray-light text-brand-dark font-bold text-lg transition-colors active:bg-brand-gray disabled:opacity-50"
+                        onClick={() => changeQty(-1)}
+                        disabled={qty <= 1}
+                      >−</button>
+                      <div className="w-12 sm:w-16 text-center font-bold text-lg sm:text-xl text-brand-dark">{qty}</div>
+                      <button 
+                        className="px-4 py-3 sm:px-5 sm:py-4 hover:bg-brand-gray-light text-brand-dark font-bold text-lg transition-colors active:bg-brand-gray"
+                        onClick={() => changeQty(1)}
+                      >+</button>
+                    </div>
+                    <div className="text-sm text-brand-gray font-medium">
+                      Total: <span className="font-bold text-brand-blue text-lg ml-1">₱{total}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">3. Delivery Method</div>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4">
                     <motion.div 
-                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                      animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                      className="mb-8 overflow-hidden"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`border-2 rounded-2xl p-4 sm:p-5 cursor-pointer transition-all ${method === 'delivery' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                      onClick={() => setMethod('delivery')}
                     >
-                      <div className="bg-[#e8f3ff] border-2 border-[#0a6ed1]/30 rounded-2xl p-5 mb-4">
-                        <div className="flex items-start gap-4">
+                      <div className="font-bold text-brand-dark flex items-center gap-3 mb-1">
+                        <span className="text-xl sm:text-2xl">🚚</span> 
+                        <span className="text-sm sm:text-base">Delivery</span>
+                      </div>
+                      <div className="text-xs sm:text-sm text-brand-gray mt-2 font-medium">We deliver to your address</div>
+                    </motion.div>
+                    <motion.div 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`border-2 rounded-2xl p-4 sm:p-5 cursor-pointer transition-all ${method === 'pickup' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                      onClick={() => setMethod('pickup')}
+                    >
+                      <div className="font-bold text-brand-dark flex items-center gap-3 mb-1">
+                        <span className="text-xl sm:text-2xl">🏪</span> 
+                        <span className="text-sm sm:text-base">Pick-up</span>
+                      </div>
+                      <div className="text-xs sm:text-sm text-brand-gray mt-2 font-medium">Pick up at the station</div>
+                    </motion.div>
+                  </div>
+
+                  <AnimatePresence>
+                    {method === 'delivery' && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-2">
+                          <label className="block text-sm font-semibold mb-2 text-brand-dark">Delivery Address</label>
+                          <input 
+                            type="text" 
+                            className="form-control text-sm sm:text-base py-3"
+                            value={address}
+                            onChange={e => setAddress(e.target.value)}
+                            placeholder="Enter your full delivery address"
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div>
+                  <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">4. Payment Method</div>
+                                    <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
+                    <motion.div 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                      onClick={() => setPaymentMethod('cash')}
+                    >
+                      <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
+                        <span className="text-3xl sm:text-4xl mb-2 drop-shadow-sm">💵</span>
+                        <span className="text-sm sm:text-base">Cash</span>
+                      </div>
+                    </motion.div>
+                    <motion.div 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${paymentMethod === 'gcash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                      onClick={() => setPaymentMethod('gcash')}
+                    >
+                      <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
+                        <span className="text-3xl sm:text-4xl mb-2 drop-shadow-sm">📱</span>
+                        <span className="text-sm sm:text-base">GCash</span>
+                      </div>
+                    </motion.div>
+                  </div>
+                  <AnimatePresence>
+                    {paymentMethod === 'gcash' && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                        animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                        exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                        className="mb-8 overflow-hidden"
+                      >
+                        <div className="bg-[#e8f3ff] border-2 border-[#0a6ed1]/30 rounded-2xl p-5 mb-4">
+                          <div className="flex items-start gap-4">
                           <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0 text-2xl">🔒</div>
                           <div>
-                            <h4 className="font-bold text-brand-dark mb-1">Secure Payment via PayMongo</h4>
-                            <p className="text-sm text-brand-gray">You will be redirected to PayMongo's secure checkout page to complete your GCash payment. This requires your site administrator to have their PayMongo API keys set up.</p>
+                            <h4 className="font-bold text-brand-dark mb-1">Secure Payment via GCash</h4>
+                            <p className="text-sm text-brand-gray">You will be redirected to our secure payment gateway to complete your GCash payment.</p>
                           </div>
                         </div>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
+                </div>
+              </div>
 
-                <div className="bg-[#f4f7fb] rounded-2xl p-4 sm:p-6 mb-8 border border-brand-border shadow-inner">
+              <div className="bg-[#f4f7fb] rounded-2xl p-4 sm:p-6 mb-8 border border-brand-border shadow-inner">
                   <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>{selectedType === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {qty}</span>
                     <span className="font-extrabold text-brand-dark">₱{total}</span>
@@ -576,7 +539,7 @@ export default function CustomerPortal() {
                   <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-3 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>Payment</span>
                     <span className="font-extrabold text-brand-dark">
-                      {paymentMethod === 'cash' ? '💵 Cash' : paymentMethod === 'qrph' ? '📷 QRPh' : paymentMethod === 'gcash' ? '📱 GCash Number' : '💳 PayMongo'}
+                      {paymentMethod === 'cash' ? '💵 Cash' : '📱 GCash (PayMongo)'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-brand-border px-1 sm:px-2">
@@ -590,11 +553,11 @@ export default function CustomerPortal() {
                   whileTap={{ scale: 0.98 }}
                   className="btn btn-primary w-full py-4 text-lg font-bold rounded-2xl shadow-md transition-all relative overflow-hidden group" 
                   onClick={placeOrder}
+                  disabled={isProcessingPayment}
                 >
-                  <span className="relative z-10">Place Order →</span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <span className="relative z-10">{isProcessingPayment ? 'Processing...' : 'Place Order →'}</span>
+                  {!isProcessingPayment && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />}
                 </motion.button>
-              </div>
             </motion.div>
           )}
 
@@ -652,6 +615,14 @@ export default function CustomerPortal() {
                           <div className="text-[10px] text-brand-gray font-mono mt-1 text-right">
                             Ref: {o.referenceNumber}
                           </div>
+                        )}
+                        {o.status === 'Pending' && !o.paid && o.checkoutUrl && o.paymentMethod === 'gcash' && (
+                          <button 
+                            onClick={() => window.open(o.checkoutUrl, '_blank')}
+                            className="text-xs font-bold text-white hover:text-white bg-[#0a6ed1] hover:bg-[#085ab3] px-3 py-1.5 rounded-full sm:mt-1 transition-colors"
+                          >
+                            Complete Payment
+                          </button>
                         )}
                         {o.status === 'Pending' && (
                           <button 
@@ -790,7 +761,7 @@ export default function CustomerPortal() {
                             ? 'bg-[#e8f5e9] text-[#2e7d32] border border-[#a5d6a7]' 
                             : 'bg-[#fff0f0] text-[#e53935] border border-[#ffcdd2]'
                         }`}>
-                          {o.paymentMethod === 'qrph' ? '📷' : o.paymentMethod === 'gcash' ? '📱' : o.paymentMethod === 'paymongo' ? '💳' : '💵'}
+                          {o.paymentMethod === 'paymongo' ? '💳' : o.paymentMethod === 'gcash' ? '📱' : '💵'}
                         </div>
                         <div>
                           <div className="flex items-center gap-2 mb-1">
@@ -798,7 +769,7 @@ export default function CustomerPortal() {
                               {o.type === 'slim' ? 'Slim Gallon' : 'Round Gallon'} × {o.qty}
                             </span>
                             <span className="text-[10px] uppercase font-bold text-brand-gray tracking-wider px-2 py-0.5 bg-slate-100 rounded-md">
-                              {o.paymentMethod === 'qrph' ? 'QRPh' : o.paymentMethod === 'gcash' ? 'GCash Number' : o.paymentMethod === 'paymongo' ? 'PayMongo' : 'Cash'}
+                              {o.paymentMethod === 'paymongo' ? 'PayMongo' : o.paymentMethod === 'gcash' ? 'GCash (Manual)' : 'Cash'}
                             </span>
                           </div>
                           <div className="text-xs text-brand-gray font-semibold mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">

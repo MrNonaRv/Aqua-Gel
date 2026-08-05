@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../lib/store';
 import { Droplets } from 'lucide-react';
@@ -8,6 +8,9 @@ export default function CustomerLogin() {
   const [tab, setTab] = useState<'login' | 'signup'>('login');
   const { customers, setCustomers, setSession } = useStore();
   const navigate = useNavigate();
+  useEffect(() => {
+    try { const sess = JSON.parse(localStorage.getItem('ag_session') || '{}'); if (sess?.role === 'customer') navigate('/customer'); } catch(e){}
+  }, [navigate]);
 
   const [error, setError] = useState('');
 

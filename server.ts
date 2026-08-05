@@ -40,7 +40,7 @@ async function startServer() {
             attributes: {
               amount: amountInCentavos,
               description: description || `Order ${orderId}`,
-              payment_method_types: ['gcash', 'paymaya', 'grab_pay', 'qrph'],
+              payment_method_types: ['card', 'paymaya', 'gcash', 'grab_pay', 'billease'],
               send_email_receipt: false,
               show_description: true,
               show_line_items: true,
@@ -66,7 +66,7 @@ async function startServer() {
 
       if (data.errors) {
         console.error('PayMongo API Error:', data.errors);
-        return res.status(400).json({ error: data.errors[0].detail });
+        return res.status(400).json({ error: 'PayMongo Error: ' + JSON.stringify(data.errors) });
       }
 
       // Return the checkout URL to the frontend

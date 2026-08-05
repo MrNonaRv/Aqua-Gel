@@ -25,8 +25,9 @@ export interface Order {
   type: 'slim' | 'round';
   qty: number;
   method: 'delivery' | 'pickup';
-  paymentMethod?: 'cash' | 'gcash' | 'qrph' | 'paymongo';
+  paymentMethod?: 'cash' | 'gcash';
   referenceNumber?: string;
+  checkoutUrl?: string;
   status: 'Pending' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
   total: number;
   paid: boolean;
@@ -96,50 +97,68 @@ const SEED_SETTINGS: Settings = {
 };
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [session, _setSession] = useState<User | null>(null);
-  const [customers, _setCustomers] = useState<Customer[]>([]);
-  const [orders, _setOrders] = useState<Order[]>([]);
-  const [inventory, _setInventory] = useState<Inventory>(SEED_INVENTORY);
-  const [personnel, _setPersonnel] = useState<string[]>([]);
-  const [stockLog, _setStockLog] = useState<{ msg: string; time: number }[]>([]);
-  const [settings, _setSettings] = useState<Settings>(SEED_SETTINGS);
+  
+function getInitialState<T>(key: string, defaultValue: T): T {
+  if (typeof window === 'undefined') return defaultValue;
+  const val = localStorage.getItem(key);
+  if (val && val !== 'undefined') {
+    try { return JSON.parse(val); } catch(e) {}
+  }
+  return defaultValue;
+}
 
+  const [session, _setSession] = useState<User | null>(() => getInitialState('ag_session', null));
+  const [customers, _setCustomers] = useState<Customer[]>(() => getInitialState('ag_customers', SEED_CUSTOMERS));
+  const [orders, _setOrders] = useState<Order[]>(() => getInitialState('ag_orders', SEED_ORDERS));
+  const [inventory, _setInventory] = useState<Inventory>(() => getInitialState('ag_inventory', SEED_INVENTORY));
+  const [personnel, _setPersonnel] = useState<string[]>(() => getInitialState('ag_personnel', SEED_PERSONNEL));
+  const [stockLog, _setStockLog] = useState<{ msg: string; time: number }[]>(() => getInitialState('ag_stocklog', []));
+  const [settings, _setSettings] = useState<Settings>(() => getInitialState('ag_settings', SEED_SETTINGS));
+
+  
   useEffect(() => {
+    // Cleanup any lingering 'undefined' in localStorage
+    ['ag_session', 'ag_customers', 'ag_orders', 'ag_inventory', 'ag_personnel', 'ag_stocklog', 'ag_settings'].forEach(key => {
+      if (localStorage.getItem(key) === 'undefined') {
+        localStorage.removeItem(key);
+      }
+    });
+
     // Load state from local storage or seed initial data
     const sSession = localStorage.getItem('ag_session');
-    if (sSession) _setSession(JSON.parse(sSession));
+    if (sSession && sSession !== 'undefined') { try { _setSession(JSON.parse(sSession)); } catch (e) { console.error('Failed to parse sSession', e); } }
 
     const sCustomers = localStorage.getItem('ag_customers');
-    if (sCustomers) _setCustomers(JSON.parse(sCustomers));
+    if (sCustomers && sCustomers !== 'undefined') { try { _setCustomers(JSON.parse(sCustomers)); } catch (e) { console.error('Failed to parse sCustomers', e); } }
     else { _setCustomers(SEED_CUSTOMERS); localStorage.setItem('ag_customers', JSON.stringify(SEED_CUSTOMERS)); }
 
     const sOrders = localStorage.getItem('ag_orders');
-    if (sOrders) _setOrders(JSON.parse(sOrders));
+    if (sOrders && sOrders !== 'undefined') { try { _setOrders(JSON.parse(sOrders)); } catch (e) { console.error('Failed to parse sOrders', e); } }
     else { _setOrders(SEED_ORDERS); localStorage.setItem('ag_orders', JSON.stringify(SEED_ORDERS)); }
 
     const sInv = localStorage.getItem('ag_inventory');
-    if (sInv) _setInventory(JSON.parse(sInv));
+    if (sInv && sInv !== 'undefined') { try { _setInventory(JSON.parse(sInv)); } catch (e) { console.error('Failed to parse sInv', e); } }
     else { _setInventory(SEED_INVENTORY); localStorage.setItem('ag_inventory', JSON.stringify(SEED_INVENTORY)); }
 
     const sPers = localStorage.getItem('ag_personnel');
-    if (sPers) _setPersonnel(JSON.parse(sPers));
+    if (sPers && sPers !== 'undefined') { try { _setPersonnel(JSON.parse(sPers)); } catch (e) { console.error('Failed to parse sPers', e); } }
     else { _setPersonnel(SEED_PERSONNEL); localStorage.setItem('ag_personnel', JSON.stringify(SEED_PERSONNEL)); }
 
     const sLog = localStorage.getItem('ag_stocklog');
-    if (sLog) _setStockLog(JSON.parse(sLog));
+    if (sLog && sLog !== 'undefined') { try { _setStockLog(JSON.parse(sLog)); } catch (e) { console.error('Failed to parse sLog', e); } }
     
     const sSettings = localStorage.getItem('ag_settings');
-    if (sSettings) _setSettings(JSON.parse(sSettings));
+    if (sSettings && sSettings !== 'undefined') { try { _setSettings(JSON.parse(sSettings)); } catch (e) { console.error('Failed to parse sSettings', e); } }
     else { _setSettings(SEED_SETTINGS); localStorage.setItem('ag_settings', JSON.stringify(SEED_SETTINGS)); }
     
     const syncState = (e: StorageEvent) => {
-      if (e.key === 'ag_session' && e.newValue) _setSession(JSON.parse(e.newValue));
-      if (e.key === 'ag_customers' && e.newValue) _setCustomers(JSON.parse(e.newValue));
-      if (e.key === 'ag_orders' && e.newValue) _setOrders(JSON.parse(e.newValue));
-      if (e.key === 'ag_inventory' && e.newValue) _setInventory(JSON.parse(e.newValue));
-      if (e.key === 'ag_personnel' && e.newValue) _setPersonnel(JSON.parse(e.newValue));
-      if (e.key === 'ag_stocklog' && e.newValue) _setStockLog(JSON.parse(e.newValue));
-      if (e.key === 'ag_settings' && e.newValue) _setSettings(JSON.parse(e.newValue));
+      if (e.key === 'ag_session' && e.newValue && e.newValue !== 'undefined') { try { _setSession(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_session', e); } }
+      if (e.key === 'ag_customers' && e.newValue && e.newValue !== 'undefined') { try { _setCustomers(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_customers', e); } }
+      if (e.key === 'ag_orders' && e.newValue && e.newValue !== 'undefined') { try { _setOrders(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_orders', e); } }
+      if (e.key === 'ag_inventory' && e.newValue && e.newValue !== 'undefined') { try { _setInventory(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_inventory', e); } }
+      if (e.key === 'ag_personnel' && e.newValue && e.newValue !== 'undefined') { try { _setPersonnel(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_personnel', e); } }
+      if (e.key === 'ag_stocklog' && e.newValue && e.newValue !== 'undefined') { try { _setStockLog(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_stocklog', e); } }
+      if (e.key === 'ag_settings' && e.newValue && e.newValue !== 'undefined') { try { _setSettings(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_settings', e); } }
     };
 
     window.addEventListener('storage', syncState);
