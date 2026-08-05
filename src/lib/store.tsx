@@ -25,7 +25,8 @@ export interface Order {
   type: 'slim' | 'round';
   qty: number;
   method: 'delivery' | 'pickup';
-  paymentMethod?: 'cash' | 'gcash';
+  paymentMethod?: 'cash' | 'gcash' | 'qrph' | 'paymongo';
+  referenceNumber?: string;
   status: 'Pending' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
   total: number;
   paid: boolean;
@@ -43,6 +44,12 @@ export interface Inventory {
   priceRound: number;
 }
 
+export interface Settings {
+  gcashName: string;
+  gcashNumber: string;
+  qrCodeUrl: string;
+}
+
 interface StoreContextType {
   session: User | null;
   setSession: (user: User | null) => void;
@@ -56,6 +63,8 @@ interface StoreContextType {
   setPersonnel: (personnel: string[]) => void;
   stockLog: { msg: string; time: number }[];
   setStockLog: (log: { msg: string; time: number }[]) => void;
+  settings: Settings;
+  setSettings: (settings: Settings) => void;
   updateCustomerBalance: (customerId: string, amountChange: number) => void;
 }
 
@@ -80,6 +89,11 @@ const SEED_ORDERS: Order[] = [
 
 const SEED_INVENTORY: Inventory = { slim: 45, round: 28, priceSlim: 35, priceRound: 40 };
 const SEED_PERSONNEL = ['Jun Dela Cruz', 'Roel Bautista', 'Mark Flores'];
+const SEED_SETTINGS: Settings = {
+  gcashName: 'Aqua Gel Station',
+  gcashNumber: '0917-123-4567',
+  qrCodeUrl: ''
+};
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [session, _setSession] = useState<User | null>(null);
@@ -88,6 +102,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [inventory, _setInventory] = useState<Inventory>(SEED_INVENTORY);
   const [personnel, _setPersonnel] = useState<string[]>([]);
   const [stockLog, _setStockLog] = useState<{ msg: string; time: number }[]>([]);
+  const [settings, _setSettings] = useState<Settings>(SEED_SETTINGS);
 
   useEffect(() => {
     // Load state from local storage or seed initial data
@@ -113,6 +128,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const sLog = localStorage.getItem('ag_stocklog');
     if (sLog) _setStockLog(JSON.parse(sLog));
     
+    const sSettings = localStorage.getItem('ag_settings');
+    if (sSettings) _setSettings(JSON.parse(sSettings));
+    else { _setSettings(SEED_SETTINGS); localStorage.setItem('ag_settings', JSON.stringify(SEED_SETTINGS)); }
+    
     const syncState = (e: StorageEvent) => {
       if (e.key === 'ag_session' && e.newValue) _setSession(JSON.parse(e.newValue));
       if (e.key === 'ag_customers' && e.newValue) _setCustomers(JSON.parse(e.newValue));
@@ -120,6 +139,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (e.key === 'ag_inventory' && e.newValue) _setInventory(JSON.parse(e.newValue));
       if (e.key === 'ag_personnel' && e.newValue) _setPersonnel(JSON.parse(e.newValue));
       if (e.key === 'ag_stocklog' && e.newValue) _setStockLog(JSON.parse(e.newValue));
+      if (e.key === 'ag_settings' && e.newValue) _setSettings(JSON.parse(e.newValue));
     };
 
     window.addEventListener('storage', syncState);
@@ -132,6 +152,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setInventory = (i: Inventory) => { _setInventory(i); localStorage.setItem('ag_inventory', JSON.stringify(i)); };
   const setPersonnel = (p: string[]) => { _setPersonnel(p); localStorage.setItem('ag_personnel', JSON.stringify(p)); };
   const setStockLog = (l: { msg: string; time: number }[]) => { _setStockLog(l); localStorage.setItem('ag_stocklog', JSON.stringify(l)); };
+  const setSettings = (s: Settings) => { _setSettings(s); localStorage.setItem('ag_settings', JSON.stringify(s)); };
 
   const updateCustomerBalance = (customerId: string, amountChange: number) => {
     const newCustomers = customers.map(c => 
@@ -161,6 +182,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       inventory, setInventory,
       personnel, setPersonnel,
       stockLog, setStockLog,
+      settings, setSettings,
       updateCustomerBalance,
     }}>
       {children}

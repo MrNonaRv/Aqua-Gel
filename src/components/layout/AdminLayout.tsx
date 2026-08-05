@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../../lib/store';
-import { LayoutDashboard, ClipboardList, Truck, Users, Droplet, LineChart, Power, Droplets, Menu, X } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, Truck, Users, Droplet, LineChart, Power, Droplets, Menu, X, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function AdminLayout() {
@@ -62,6 +62,9 @@ export default function AdminLayout() {
           </NavLink>
           <NavLink to="/admin/reports" onClick={() => setIsSidebarOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-brand-blue text-white shadow-md shadow-brand-blue/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
             <LineChart size={18} /> Reports
+          </NavLink>
+          <NavLink to="/admin/settings" onClick={() => setIsSidebarOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-brand-blue text-white shadow-md shadow-brand-blue/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+            <Settings size={18} /> Settings
           </NavLink>
         </nav>
 

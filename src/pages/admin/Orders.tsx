@@ -3,7 +3,7 @@ import { useStore, Order, Customer } from '../../lib/store';
 import { notifyStatusChange } from '../../lib/notifications';
 
 export default function Orders() {
-  const { orders, setOrders, personnel, updateCustomerBalance, customers, setCustomers, inventory } = useStore();
+  const { orders, setOrders, personnel, updateCustomerBalance, customers, setCustomers, inventory, setInventory } = useStore();
   const [statusF, setStatusF] = useState('');
   const [paidF, setPaidF] = useState('');
   const [methodF, setMethodF] = useState('');
@@ -135,6 +135,8 @@ export default function Orders() {
     
     const wasPaid = editOrder.paid;
     const parsedPaidDate = ePaid ? new Date(ePaidDate).getTime() : undefined;
+    const wasCancelled = editOrder.status === 'Cancelled';
+    const isCancelled = eStatus === 'Cancelled';
 
     const updated = orders.map(o => {
       if (o.id === editOrder.id) {
@@ -150,10 +152,29 @@ export default function Orders() {
       return o;
     });
 
-    if (!wasPaid && ePaid) {
-      updateCustomerBalance(editOrder.customerId, -editOrder.total);
-    } else if (wasPaid && !ePaid) {
-      updateCustomerBalance(editOrder.customerId, editOrder.total);
+    if (!wasCancelled && isCancelled) {
+      // Refilling inventory
+      setInventory({ ...inventory, [editOrder.type]: inventory[editOrder.type] + editOrder.qty });
+      
+      // If it's cancelled and was unpaid, we should reduce the customer's balance.
+      // But let's check what ePaid is, if it's currently unpaid we reduce balance.
+      // Because if it was paid, there's no unpaid balance to reverse (we'd need a refund mechanism).
+      if (!wasPaid) {
+        updateCustomerBalance(editOrder.customerId, -editOrder.total);
+      }
+    } else if (wasCancelled && !isCancelled) {
+      // Un-cancelling (rare, but possible)
+      setInventory({ ...inventory, [editOrder.type]: inventory[editOrder.type] - editOrder.qty });
+      if (!ePaid) {
+        updateCustomerBalance(editOrder.customerId, editOrder.total);
+      }
+    } else {
+      // Normal flow (no cancellation state change)
+      if (!wasPaid && ePaid) {
+        updateCustomerBalance(editOrder.customerId, -editOrder.total);
+      } else if (wasPaid && !ePaid) {
+        updateCustomerBalance(editOrder.customerId, editOrder.total);
+      }
     }
 
     setOrders(updated);
@@ -247,6 +268,11 @@ export default function Orders() {
                         <span className={`badge ${o.paid ? 'badge-paid' : 'badge-unpaid'} mr-2`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
                         {o.paymentMethod && <span className="text-[10px] text-brand-gray font-semibold tracking-wider">{o.paymentMethod.toUpperCase()}</span>}
                       </div>
+                      {o.referenceNumber && (
+                        <div className="text-[10px] font-mono text-brand-gray mt-0.5">
+                          Ref: {o.referenceNumber}
+                        </div>
+                      )}
                       {o.paid && o.paidDate && (
                         <span className="text-[10.5px] text-brand-green font-bold mt-1">
                           Paid: {new Date(o.paidDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}

@@ -10,6 +10,7 @@ import Delivery from './pages/admin/Delivery';
 import Customers from './pages/admin/Customers';
 import Inventory from './pages/admin/Inventory';
 import Reports from './pages/admin/Reports';
+import Settings from './pages/admin/Settings';
 import CustomerPortal from './pages/customer/CustomerPortal';
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="customers" element={<Customers />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* Customer Routes */}

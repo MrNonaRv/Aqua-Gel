@@ -8,7 +8,7 @@ import { SlimGallonIcon, RoundGallonIcon } from '../../components/icons/Gallons'
 
 export default function CustomerPortal() {
   useCustomerNotifications();
-  const { session, setSession, inventory, setInventory, orders, setOrders, customers, setCustomers } = useStore();
+  const { session, setSession, inventory, setInventory, orders, setOrders, customers, setCustomers, settings } = useStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState<'order' | 'myorders' | 'payments' | 'profile'>('order');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -19,7 +19,8 @@ export default function CustomerPortal() {
   const [selectedType, setSelectedType] = useState<'slim' | 'round'>('slim');
   const [qty, setQty] = useState(1);
   const [method, setMethod] = useState<'delivery' | 'pickup'>('delivery');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'qrph' | 'gcash'>('cash');
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [address, setAddress] = useState(customer?.address || '');
   const [orderSuccess, setOrderSuccess] = useState('');
 
@@ -35,7 +36,30 @@ export default function CustomerPortal() {
   const unitPrice = selectedType === 'slim' ? inventory.priceSlim : inventory.priceRound;
   const total = unitPrice * qty;
 
-  const placeOrder = () => {
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  useEffect(() => {
+    // Handle return from PayMongo
+    const params = new URLSearchParams(window.location.search);
+    const isSuccess = params.get('payment_success');
+    const orderId = params.get('order_id');
+
+    if (isSuccess === 'true' && orderId) {
+      // Find order and mark as paid
+      const order = orders.find(o => o.id === orderId);
+      if (order && !order.paid) {
+        setOrders(orders.map(o => o.id === orderId ? { ...o, paid: true, paidDate: Date.now() } : o));
+        setOrderSuccess(`✅ Payment successful via PayMongo! Order ${orderId} is now paid.`);
+        setTab('myorders');
+        setTimeout(() => setOrderSuccess(''), 5000);
+      }
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [orders, setOrders]);
+
+  const placeOrder = async () => {
     const stock = inventory[selectedType];
     if (stock < qty) {
       alert(`Not enough ${selectedType} gallons in stock (${stock} available).`);
@@ -46,18 +70,86 @@ export default function CustomerPortal() {
       return;
     }
 
+    if ((paymentMethod === 'qrph' || paymentMethod === 'gcash') && !referenceNumber.trim()) {
+      alert(`Please enter your ${paymentMethod === 'gcash' ? 'GCash' : 'QRPh'} Reference Number.`);
+      return;
+    }
+
+    const orderId = 'o' + Date.now();
+
+    if (paymentMethod === 'paymongo') {
+      setIsProcessingPayment(true);
+      try {
+        // Create pending unpaid order first
+        const newOrder = {
+          id: orderId,
+          customerId: session!.id,
+          customerName: session!.name,
+          type: selectedType,
+          qty,
+          method,
+          paymentMethod,
+          status: 'Pending' as const,
+          total,
+          paid: false,
+          date: Date.now(),
+          personnel: null,
+          address: method === 'delivery' ? address : null,
+          containerReturn: false
+        };
+
+        setOrders([newOrder, ...orders]);
+        setInventory({ ...inventory, [selectedType]: inventory[selectedType] - qty });
+
+        // Call backend to create PayMongo checkout session
+        const response = await fetch('/api/paymongo/create-checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: total,
+            description: `Refilling Order - ${qty}x ${selectedType} gallon(s)`,
+            orderId: orderId,
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (data.checkoutUrl) {
+          // Redirect to PayMongo secure checkout
+          window.location.href = data.checkoutUrl;
+          return;
+        } else {
+          alert('Failed to initialize payment gateway: ' + (data.error || 'Unknown error'));
+          // Revert order if gateway fails
+          setOrders(orders.filter(o => o.id !== orderId));
+          setInventory({ ...inventory, [selectedType]: inventory[selectedType] + qty });
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Network error. Please try again.');
+        // Revert order
+        setOrders(orders.filter(o => o.id !== orderId));
+        setInventory({ ...inventory, [selectedType]: inventory[selectedType] + qty });
+      } finally {
+        setIsProcessingPayment(false);
+      }
+      return;
+    }
+
     const newOrder = {
-      id: 'o' + Date.now(),
+      id: orderId,
       customerId: session!.id,
       customerName: session!.name,
       type: selectedType,
       qty,
       method,
       paymentMethod,
+      referenceNumber: (paymentMethod === 'qrph' || paymentMethod === 'gcash') ? referenceNumber.trim() : undefined,
       status: 'Pending' as const,
       total,
-      paid: paymentMethod !== 'cash',
-      paidDate: paymentMethod !== 'cash' ? Date.now() : undefined,
+      paid: false, // All manual payments are unpaid until verified/collected
       date: Date.now(),
       personnel: null,
       address: method === 'delivery' ? address : null,
@@ -67,18 +159,30 @@ export default function CustomerPortal() {
     setOrders([newOrder, ...orders]);
     setInventory({ ...inventory, [selectedType]: inventory[selectedType] - qty });
     
-    // Update unpaid balance only if cash
+    // Update unpaid balance for cash orders
     if (customer && paymentMethod === 'cash') {
       setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: c.unpaid + total } : c));
     }
 
-    if (paymentMethod !== 'cash') {
-      setOrderSuccess(`✅ Payment successful via GCash. Order placed! Total: ₱${total}. Status: Pending.`);
-    } else {
-      setOrderSuccess(`✅ Order placed successfully! Total: ₱${total}. Status: Pending.`);
-    }
+    setOrderSuccess(`✅ Order placed successfully! Total: ₱${total}. Status: Pending.`);
     setQty(1);
+    setReferenceNumber('');
     setTimeout(() => setOrderSuccess(''), 5000);
+  };
+
+  const handleCancelOrder = (orderId: string) => {
+    const confirmCancel = window.confirm('Are you sure you want to cancel this order?');
+    if (!confirmCancel) return;
+
+    const order = orders.find(o => o.id === orderId);
+    if (!order || order.status !== 'Pending') return;
+
+    setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'Cancelled' } : o));
+    setInventory({ ...inventory, [order.type]: inventory[order.type] + order.qty });
+    
+    if (order.paymentMethod === 'cash' && order.customerId !== 'guest') {
+      setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, c.unpaid - order.total) } : c));
+    }
   };
 
   const myOrders = orders.filter(o => o.customerId === session?.id).sort((a,b) => b.date - a.date);
@@ -304,30 +408,161 @@ export default function CustomerPortal() {
                 </AnimatePresence>
 
                 <div className="font-heading text-lg sm:text-xl font-bold mb-4 text-brand-dark">4. Payment Method</div>
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-8">
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'cash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setPaymentMethod('cash')}
                   >
                     <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
                       <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">💵</span>
-                      <span className="text-sm sm:text-base">Cash</span>
+                      <span className="text-xs sm:text-sm">Cash</span>
                     </div>
                   </motion.div>
                   <motion.div 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all ${paymentMethod === 'gcash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    className={`border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'qrph' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    onClick={() => setPaymentMethod('qrph')}
+                  >
+                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
+                      <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">📷</span>
+                      <span className="text-xs sm:text-sm">Scan to Pay</span>
+                    </div>
+                  </motion.div>
+                  <motion.div 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'gcash' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
                     onClick={() => setPaymentMethod('gcash')}
                   >
                     <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
                       <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">📱</span>
-                      <span className="text-sm sm:text-base">GCash</span>
+                      <span className="text-xs sm:text-sm">GCash Number</span>
+                    </div>
+                  </motion.div>
+                  <motion.div 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`border-2 rounded-2xl p-3 sm:p-4 cursor-pointer transition-all ${paymentMethod === 'paymongo' ? 'border-[#0a6ed1] bg-[#e8f3ff] shadow-md ring-2 ring-[#0a6ed1]/20' : 'border-brand-border hover:border-brand-blue/30 bg-white'}`}
+                    onClick={() => setPaymentMethod('paymongo')}
+                  >
+                    <div className="font-bold text-center text-brand-dark flex flex-col items-center justify-center h-full">
+                      <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">💳</span>
+                      <span className="text-xs sm:text-sm text-center">PayMongo (E-Wallet)</span>
                     </div>
                   </motion.div>
                 </div>
+
+                <AnimatePresence>
+                  {paymentMethod === 'qrph' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                      animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                      className="mb-8 overflow-hidden"
+                    >
+                      <div className="bg-[#e8f3ff] border-2 border-[#0a6ed1]/30 rounded-2xl p-5 mb-4 text-center flex flex-col items-center justify-center">
+                        <h4 className="font-bold text-brand-dark mb-1">Pay via QRPh</h4>
+                        <p className="text-sm text-brand-gray mb-4">Scan the QR code below using your e-wallet or banking app.</p>
+                        
+                        <div className="bg-white p-4 rounded-xl border border-brand-border shadow-sm mb-4 inline-block">
+                          {settings.qrCodeUrl ? (
+                            <img src={settings.qrCodeUrl} alt="QR Code" className="w-48 h-48 sm:w-64 sm:h-64 object-contain" />
+                          ) : (
+                            <svg className="w-32 h-32 text-brand-dark opacity-80" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-3 0h2v2h-2v-2zm3 3h3v2h-3v-2zm-3 0h2v2h-2v-2zm3 3h3v2h-3v-2zm-3 0h2v2h-2v-2zm0-9h5v2h-5v-2z"/>
+                            </svg>
+                          )}
+                        </div>
+
+                        <div className="text-center mb-2">
+                          <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">Account Name</div>
+                          <div className="font-bold text-brand-dark">{settings.gcashName}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">GCash Number</div>
+                          <div className="font-mono font-bold text-lg text-brand-dark">{settings.gcashNumber}</div>
+                        </div>
+                      </div>
+                      
+                      <label className="block text-sm font-semibold mb-2 text-brand-dark">Reference Number (Required)</label>
+                      <input 
+                        type="text" 
+                        className="form-control text-sm sm:text-base py-3 shadow-inner font-mono tracking-wider" 
+                        value={referenceNumber} 
+                        onChange={e => setReferenceNumber(e.target.value)} 
+                        placeholder="e.g. 1029384756" 
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {paymentMethod === 'gcash' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                      animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                      className="mb-8 overflow-hidden"
+                    >
+                      <div className="bg-[#e8f3ff] border-2 border-[#0a6ed1]/30 rounded-2xl p-5 mb-4 text-center">
+                        <h4 className="font-bold text-brand-dark mb-1">Pay via GCash Number</h4>
+                        <p className="text-sm text-brand-gray mb-4">Send exactly ₱{total} to the GCash number below.</p>
+                        
+                        <div className="bg-white px-6 py-4 rounded-xl border border-brand-border shadow-sm inline-block text-left w-full sm:w-auto">
+                          <div className="mb-2">
+                            <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">Send Amount</div>
+                            <div className="font-mono font-bold text-xl text-brand-blue">₱ {total}.00</div>
+                          </div>
+                          <div className="mb-2">
+                            <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">Account Name</div>
+                            <div className="font-bold text-brand-dark">{settings.gcashName}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-brand-gray font-semibold mb-0.5 uppercase tracking-wider">GCash Number</div>
+                            <div className="font-mono font-bold text-lg text-brand-dark">{settings.gcashNumber}</div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 text-xs text-brand-gray font-medium">
+                          After sending, enter your Reference Number below.
+                        </div>
+                      </div>
+                      
+                      <label className="block text-sm font-semibold mb-2 text-brand-dark">Reference Number (Required)</label>
+                      <input 
+                        type="text" 
+                        className="form-control text-sm sm:text-base py-3 shadow-inner font-mono tracking-wider" 
+                        value={referenceNumber} 
+                        onChange={e => setReferenceNumber(e.target.value)} 
+                        placeholder="e.g. 1029384756" 
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {paymentMethod === 'paymongo' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                      animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                      className="mb-8 overflow-hidden"
+                    >
+                      <div className="bg-[#e8f3ff] border-2 border-[#0a6ed1]/30 rounded-2xl p-5 mb-4">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0 text-2xl">🔒</div>
+                          <div>
+                            <h4 className="font-bold text-brand-dark mb-1">Secure Payment via PayMongo</h4>
+                            <p className="text-sm text-brand-gray">You will be redirected to PayMongo's secure checkout page to complete your GCash payment. This requires your site administrator to have their PayMongo API keys set up.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <div className="bg-[#f4f7fb] rounded-2xl p-4 sm:p-6 mb-8 border border-brand-border shadow-inner">
                   <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
@@ -341,7 +576,7 @@ export default function CustomerPortal() {
                   <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-3 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>Payment</span>
                     <span className="font-extrabold text-brand-dark">
-                      {paymentMethod === 'cash' ? '💵 Cash' : '📱 GCash'}
+                      {paymentMethod === 'cash' ? '💵 Cash' : paymentMethod === 'qrph' ? '📷 QRPh' : paymentMethod === 'gcash' ? '📱 GCash Number' : '💳 PayMongo'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-brand-border px-1 sm:px-2">
@@ -413,6 +648,19 @@ export default function CustomerPortal() {
                           <span className={`badge py-0.5 px-2 text-[10px] sm:text-xs font-bold leading-none ${o.paid ? 'badge-paid' : 'badge-unpaid'}`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
                           {o.paymentMethod && <span className="badge py-0.5 px-2 text-[10px] sm:text-xs font-bold leading-none bg-brand-gray-light text-brand-gray uppercase">{o.paymentMethod}</span>}
                         </div>
+                        {o.referenceNumber && (
+                          <div className="text-[10px] text-brand-gray font-mono mt-1 text-right">
+                            Ref: {o.referenceNumber}
+                          </div>
+                        )}
+                        {o.status === 'Pending' && (
+                          <button 
+                            onClick={() => handleCancelOrder(o.id)} 
+                            className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full sm:mt-1 transition-colors"
+                          >
+                            Cancel Order
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -542,7 +790,7 @@ export default function CustomerPortal() {
                             ? 'bg-[#e8f5e9] text-[#2e7d32] border border-[#a5d6a7]' 
                             : 'bg-[#fff0f0] text-[#e53935] border border-[#ffcdd2]'
                         }`}>
-                          {o.paymentMethod === 'gcash' ? '📱' : '💵'}
+                          {o.paymentMethod === 'qrph' ? '📷' : o.paymentMethod === 'gcash' ? '📱' : o.paymentMethod === 'paymongo' ? '💳' : '💵'}
                         </div>
                         <div>
                           <div className="flex items-center gap-2 mb-1">
@@ -550,7 +798,7 @@ export default function CustomerPortal() {
                               {o.type === 'slim' ? 'Slim Gallon' : 'Round Gallon'} × {o.qty}
                             </span>
                             <span className="text-[10px] uppercase font-bold text-brand-gray tracking-wider px-2 py-0.5 bg-slate-100 rounded-md">
-                              {o.paymentMethod === 'gcash' ? 'GCash' : 'Cash'}
+                              {o.paymentMethod === 'qrph' ? 'QRPh' : o.paymentMethod === 'gcash' ? 'GCash Number' : o.paymentMethod === 'paymongo' ? 'PayMongo' : 'Cash'}
                             </span>
                           </div>
                           <div className="text-xs text-brand-gray font-semibold mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
