@@ -84,7 +84,7 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 lg:ml-64 p-6 md:p-8 h-screen overflow-y-auto pt-20 lg:pt-8 w-full max-w-[100vw]">
+      <main className="flex-1 lg:ml-64 p-6 md:p-8 h-screen overflow-y-auto pt-20 lg:pt-8 min-w-0">
         {/* Mobile Header */}
         <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-brand-border flex items-center px-4 z-30 shadow-sm">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-brand-dark hover:bg-brand-gray-light rounded-lg">

@@ -311,7 +311,7 @@ export default function CustomerPortal() {
         </div>
       </aside>
 
-      <main className="flex-1 lg:ml-64 p-4 sm:p-6 md:p-8 lg:p-10 hide-scrollbar overflow-x-hidden pt-20 lg:pt-8 pb-12 w-full max-w-[100vw]">
+      <main className="flex-1 lg:ml-64 p-4 sm:p-6 md:p-8 lg:p-10 hide-scrollbar overflow-x-hidden pt-20 lg:pt-8 pb-12 min-w-0">
         {/* Mobile Header */}
         <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-brand-border flex items-center px-4 z-30 shadow-sm">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-brand-dark hover:bg-brand-gray-light rounded-lg">
@@ -382,6 +382,7 @@ export default function CustomerPortal() {
                         <div>
                           <div className="font-bold text-brand-dark text-sm sm:text-base">Slim Gallon</div>
                           <div className="text-brand-blue font-black mt-1">₱{inventory.priceSlim}</div>
+                          <div className="text-[11px] text-brand-gray mt-1 font-medium">{inventory.slim} available</div>
                         </div>
                       </div>
                     </motion.div>
@@ -398,6 +399,7 @@ export default function CustomerPortal() {
                         <div>
                           <div className="font-bold text-brand-dark text-sm sm:text-base">Round Gallon</div>
                           <div className="text-brand-blue font-black mt-1">₱{inventory.priceRound}</div>
+                          <div className="text-[11px] text-brand-gray mt-1 font-medium">{inventory.round} available</div>
                         </div>
                       </div>
                     </motion.div>
