@@ -39,6 +39,7 @@ export default function CustomerPortal() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
+    console.log('useEffect running, orders:', orders);
     // Handle return from PayMongo
     const params = new URLSearchParams(window.location.search);
     const isSuccess = params.get('payment_success');
@@ -162,7 +163,7 @@ export default function CustomerPortal() {
         
         if (data.checkoutUrl) {
           // Save the checkout URL to the order so it can be resumed
-          setOrders(prev => prev.map(o => o.id === orderId ? { ...o, checkoutUrl: data.checkoutUrl } : o));
+          setOrders([newOrder, ...orders].map(o => o.id === orderId ? { ...o, checkoutUrl: data.checkoutUrl } : o));
 
           window.location.href = data.checkoutUrl;
           setTab('myorders');
