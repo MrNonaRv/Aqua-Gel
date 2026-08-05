@@ -94,12 +94,7 @@ export default function CustomerPortal() {
       const data = await response.json();
       
       if (data.checkoutUrl) {
-        const newWindow = window.open(data.checkoutUrl, '_blank');
-        if (!newWindow) {
-          alert('Popup blocked! Please allow popups to proceed to payment.');
-        } else {
-          setOrderSuccess('Payment window opened. Please complete your transaction securely.');
-        }
+        window.location.href = data.checkoutUrl;
       } else {
         alert('Failed to initialize payment gateway: ' + (data.error || 'Unknown error'));
       }
@@ -169,13 +164,7 @@ export default function CustomerPortal() {
           // Save the checkout URL to the order so it can be resumed
           setOrders(prev => prev.map(o => o.id === orderId ? { ...o, checkoutUrl: data.checkoutUrl } : o));
 
-          // PayMongo blocks iframe embedding, so we open in a new tab
-          const newWindow = window.open(data.checkoutUrl, '_blank');
-          if (!newWindow) {
-            alert('Popup blocked! Please click "Complete Payment" in your orders list to pay via GCash.');
-          } else {
-            setOrderSuccess('Payment window opened. Please complete your transaction securely.');
-          }
+          window.location.href = data.checkoutUrl;
           setTab('myorders');
           return;
         } else {
