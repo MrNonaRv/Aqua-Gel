@@ -61,6 +61,7 @@ export default function CustomerPortal() {
       const order = orders.find(o => o.id === orderId);
       if (order && !order.paid) {
         setOrders(orders.map(o => o.id === orderId ? { ...o, paid: true, paidDate: Date.now() } : o));
+        setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, c.unpaid - order.total) } : c));
         setOrderSuccess(`✅ Payment successful via PayMongo! Order ${orderId} is now paid.`);
         setTab('myorders');
         setTimeout(() => setOrderSuccess(''), 5000);
@@ -145,6 +146,9 @@ export default function CustomerPortal() {
 
         setOrders([newOrder, ...orders]);
         setInventory({ ...inventory, [selectedType]: inventory[selectedType] - qty });
+        if (customer) {
+          setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: c.unpaid + total } : c));
+        }
 
         // Call backend to create PayMongo checkout session
         const response = await fetch('/api/paymongo/create-checkout', {
@@ -179,6 +183,7 @@ export default function CustomerPortal() {
           // Revert order if gateway fails
           setOrders(orders.filter(o => o.id !== orderId));
           setInventory({ ...inventory, [selectedType]: inventory[selectedType] + qty });
+          if (customer) setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: Math.max(0, c.unpaid - total) } : c));
         }
       } catch (err) {
         console.error(err);
@@ -186,6 +191,7 @@ export default function CustomerPortal() {
         // Revert order
         setOrders(orders.filter(o => o.id !== orderId));
         setInventory({ ...inventory, [selectedType]: inventory[selectedType] + qty });
+        if (customer) setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: Math.max(0, c.unpaid - total) } : c));
       } finally {
         setIsProcessingPayment(false);
       }
@@ -215,8 +221,8 @@ export default function CustomerPortal() {
     setOrders([newOrder, ...orders]);
     setInventory({ ...inventory, [selectedType]: inventory[selectedType] - qty });
     
-    // Update unpaid balance for cash orders
-    if (customer && paymentMethod === 'cash') {
+    // Update unpaid balance
+    if (customer) {
       setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: c.unpaid + total } : c));
     }
 
@@ -235,6 +241,9 @@ export default function CustomerPortal() {
 
     setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'Cancelled' } : o));
     setInventory({ ...inventory, [order.type]: inventory[order.type] + order.qty });
+    if (!order.paid) {
+      setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, c.unpaid - order.total) } : c));
+    }
     
     if (order.paymentMethod === 'cash' && order.customerId !== 'guest') {
       setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, c.unpaid - order.total) } : c));
