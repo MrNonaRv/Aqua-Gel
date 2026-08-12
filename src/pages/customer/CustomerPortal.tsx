@@ -39,7 +39,6 @@ export default function CustomerPortal() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
-    console.log('useEffect running, orders:', orders);
     // Handle return from PayMongo
     const params = new URLSearchParams(window.location.search);
     const isSuccess = params.get('payment_success');
@@ -71,7 +70,8 @@ export default function CustomerPortal() {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [orders, setOrders]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   
   const payOutstandingBalance = async () => {

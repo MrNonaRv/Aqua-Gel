@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../../lib/store';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Reports() {
   const { orders } = useStore();
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [subFilter, setSubFilter] = useState<{name: string, start: number, end: number} | null>(null);
+
+  useEffect(() => {
+    setSubFilter(null);
+  }, [period]);
 
   const now = new Date();
   
@@ -26,14 +31,8 @@ export default function Reports() {
   };
 
   const start = getRange(period);
-  const periodOrders = orders.filter(o => o.date >= start);
-  const paid = periodOrders.filter(o => o.paid);
-  const unpaid = periodOrders.filter(o => !o.paid);
-  
-  const income = paid.reduce((s, o) => s + o.total, 0);
-  const outstanding = unpaid.reduce((s, o) => s + o.total, 0);
-  const slimSold = paid.filter(o => o.type === 'slim').reduce((s, o) => s + o.qty, 0);
-  const roundSold = paid.filter(o => o.type === 'round').reduce((s, o) => s + o.qty, 0);
+  const basePeriodOrders = orders.filter(o => o.date >= start);
+  const basePaid = basePeriodOrders.filter(o => o.paid);
 
   // Chart Data
   let chartData: any[] = [];
@@ -45,10 +44,12 @@ export default function Reports() {
     chartData = hours.map(h => {
       const hs = new Date(now); hs.setHours(h, 0, 0, 0);
       const he = new Date(now); he.setHours(h, 59, 59, 999);
-      const total = paid.filter(o => o.date >= hs.getTime() && o.date <= he.getTime()).reduce((s, o) => s + o.total, 0);
+      const total = basePaid.filter(o => o.date >= hs.getTime() && o.date <= he.getTime()).reduce((s, o) => s + o.total, 0);
       return {
         name: `${h === 0 ? 12 : h > 12 ? h - 12 : h}${h >= 12 ? 'pm' : 'am'}`,
-        total
+        total,
+        startMs: hs.getTime(),
+        endMs: he.getTime()
       };
     });
   } else if (period === 'weekly') {
@@ -62,10 +63,12 @@ export default function Reports() {
     chartData = labels.map(d => {
       const ds = new Date(d); ds.setHours(0, 0, 0, 0);
       const de = new Date(d); de.setHours(23, 59, 59, 999);
-      const total = paid.filter(o => o.date >= ds.getTime() && o.date <= de.getTime()).reduce((s, o) => s + o.total, 0);
+      const total = basePaid.filter(o => o.date >= ds.getTime() && o.date <= de.getTime()).reduce((s, o) => s + o.total, 0);
       return { 
         name: d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }), 
-        total 
+        total,
+        startMs: ds.getTime(),
+        endMs: de.getTime()
       };
     });
   } else if (period === 'monthly') {
@@ -74,8 +77,8 @@ export default function Reports() {
     chartData = weeks.map((w, i) => {
       const ws = new Date(now.getFullYear(), now.getMonth(), w).getTime();
       const we = new Date(now.getFullYear(), now.getMonth(), weeks[i+1] || 32).getTime();
-      const total = paid.filter(o => o.date >= ws && o.date < we).reduce((s, o) => s + o.total, 0);
-      return { name: `Week ${i+1}`, total };
+      const total = basePaid.filter(o => o.date >= ws && o.date < we).reduce((s, o) => s + o.total, 0);
+      return { name: `Week ${i+1}`, total, startMs: ws, endMs: we - 1 };
     });
   } else {
     chartTitle = 'Income by Month (This Year)';
@@ -83,23 +86,36 @@ export default function Reports() {
     chartData = months.map((m, i) => {
       const ms = new Date(now.getFullYear(), i, 1).getTime();
       const me = new Date(now.getFullYear(), i+1, 1).getTime();
-      const total = paid.filter(o => o.date >= ms && o.date < me).reduce((s, o) => s + o.total, 0);
-      return { name: m, total };
+      const total = basePaid.filter(o => o.date >= ms && o.date < me).reduce((s, o) => s + o.total, 0);
+      return { name: m, total, startMs: ms, endMs: me - 1 };
     });
   }
 
+  let finalOrders = basePeriodOrders;
+  if (subFilter) {
+    finalOrders = finalOrders.filter(o => o.date >= subFilter.start && o.date <= subFilter.end);
+  }
+
+  const paid = finalOrders.filter(o => o.paid);
+  const unpaid = finalOrders.filter(o => !o.paid);
+  
+  const income = paid.reduce((s, o) => s + o.total, 0);
+  const outstanding = unpaid.reduce((s, o) => s + o.total, 0);
+  const slimSold = paid.filter(o => o.type === 'slim').reduce((s, o) => s + o.qty, 0);
+  const roundSold = paid.filter(o => o.type === 'round').reduce((s, o) => s + o.qty, 0);
+  
   const periodLabels = { daily: 'Today', weekly: 'Last 7 Days', monthly: 'This Month', yearly: 'This Year' };
 
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="font-heading text-3xl font-bold mb-1">Income Reports</h1>
-        <p className="text-brand-gray">Track sales performance across different time periods</p>
+        <p className="text-brand-gray">Track sales performance across different time periods. Click on a bar in the chart to filter metrics for that specific period.</p>
       </div>
 
-      {(period === 'daily' || period === 'weekly') && (
+      {(period === 'daily' || period === 'weekly' || subFilter) && (
         <div className="bg-gradient-to-r from-brand-blue to-brand-teal text-white p-6 rounded-2xl mb-8 shadow-md">
-          <div className="text-white/80 font-medium mb-1 uppercase tracking-wider text-sm">Total Income {periodLabels[period]}</div>
+          <div className="text-white/80 font-medium mb-1 uppercase tracking-wider text-sm">Total Income {subFilter ? subFilter.name : periodLabels[period]}</div>
           <div className="font-heading text-4xl font-bold">₱{income.toLocaleString()}</div>
         </div>
       )}
@@ -150,7 +166,22 @@ export default function Reports() {
                 contentStyle={{ borderRadius: '12px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Total Income']}
               />
-              <Bar dataKey="total" fill="#0a6ed1" radius={[6, 6, 0, 0]} maxBarSize={60} />
+              <Bar 
+                dataKey="total" 
+                fill="#0a6ed1" 
+                radius={[6, 6, 0, 0]} 
+                maxBarSize={60} 
+                cursor="pointer"
+                onClick={(data) => {
+                  if (data && data.payload) {
+                    if (subFilter?.name === data.payload.name) {
+                      setSubFilter(null);
+                    } else {
+                      setSubFilter({ name: data.payload.name, start: data.payload.startMs, end: data.payload.endMs });
+                    }
+                  }
+                }}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -177,7 +208,7 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {periodOrders.length > 0 ? periodOrders.sort((a,b)=>b.date - a.date).map(o => (
+              {finalOrders.length > 0 ? [...finalOrders].sort((a,b)=>b.date - a.date).map(o => (
                 <tr key={o.id}>
                   <td className="text-xs text-brand-gray">
                     {new Date(o.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
