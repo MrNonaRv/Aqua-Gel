@@ -117,6 +117,25 @@ function getInitialState<T>(key: string, defaultValue: T): T {
 
   
   useEffect(() => {
+    // Shift mock dates to current week so they don't age out during preview
+    const shifted = localStorage.getItem('ag_mock_shifted');
+    if (!shifted) {
+      const stored = localStorage.getItem('ag_orders');
+      if (stored && stored !== 'undefined') {
+        try {
+          const parsed = JSON.parse(stored);
+          const now = Date.now();
+          const maxDate = Math.max(...parsed.map(o => o.date));
+          const diff = now - maxDate;
+          if (diff > 86400000) {
+            const updated = parsed.map(o => ({...o, date: o.date + diff, paidDate: o.paidDate ? o.paidDate + diff : undefined}));
+            localStorage.setItem('ag_orders', JSON.stringify(updated));
+            localStorage.setItem('ag_mock_shifted', 'true');
+          }
+        } catch(e) {}
+      }
+    }
+
     // Cleanup any lingering 'undefined' in localStorage
     ['ag_session', 'ag_customers', 'ag_orders', 'ag_inventory', 'ag_personnel', 'ag_stocklog', 'ag_settings'].forEach(key => {
       if (localStorage.getItem(key) === 'undefined') {
