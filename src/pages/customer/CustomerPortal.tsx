@@ -415,7 +415,23 @@ export default function CustomerPortal() {
                         onClick={() => changeQty(-1)}
                         disabled={qty <= 1}
                       >−</button>
-                      <div className="w-12 sm:w-16 text-center font-bold text-lg sm:text-xl text-brand-dark">{qty}</div>
+                      <input 
+                        type="number"
+                        min="1"
+                        value={qty}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '') setQty('' as any);
+                          else {
+                            const num = parseInt(val);
+                            if (!isNaN(num) && num > 0) setQty(num);
+                          }
+                        }}
+                        onBlur={() => {
+                          if (typeof qty !== 'number' || qty < 1) setQty(1);
+                        }}
+                        className="w-16 sm:w-20 text-center font-bold text-lg sm:text-xl text-brand-dark border-none focus:outline-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-transparent"
+                      />
                       <button 
                         className="px-4 py-3 sm:px-5 sm:py-4 hover:bg-brand-gray-light text-brand-dark font-bold text-lg transition-colors active:bg-brand-gray"
                         onClick={() => changeQty(1)}

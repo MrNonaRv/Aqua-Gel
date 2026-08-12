@@ -4,13 +4,16 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 export default function Reports() {
   const { orders } = useStore();
-  const [period, setPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
 
   const now = new Date();
   
   const getRange = (p: string) => {
     let start;
-    if (p === 'weekly') {
+    if (p === 'daily') {
+      start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+    } else if (p === 'weekly') {
       start = new Date(now); 
       start.setDate(now.getDate() - 6); 
       start.setHours(0, 0, 0, 0);
@@ -36,7 +39,19 @@ export default function Reports() {
   let chartData: any[] = [];
   let chartTitle = '';
 
-  if (period === 'weekly') {
+  if (period === 'daily') {
+    chartTitle = 'Income Today (by Hour)';
+    const hours = Array.from({length: 24}, (_, i) => i);
+    chartData = hours.map(h => {
+      const hs = new Date(now); hs.setHours(h, 0, 0, 0);
+      const he = new Date(now); he.setHours(h, 59, 59, 999);
+      const total = paid.filter(o => o.date >= hs.getTime() && o.date <= he.getTime()).reduce((s, o) => s + o.total, 0);
+      return {
+        name: `${h === 0 ? 12 : h > 12 ? h - 12 : h}${h >= 12 ? 'pm' : 'am'}`,
+        total
+      };
+    });
+  } else if (period === 'weekly') {
     chartTitle = 'Income by Day (Last 7 Days)';
     const labels = [];
     for (let i = 6; i >= 0; i--) { 
@@ -73,7 +88,7 @@ export default function Reports() {
     });
   }
 
-  const periodLabels = { weekly: 'Last 7 Days', monthly: 'This Month', yearly: 'This Year' };
+  const periodLabels = { daily: 'Today', weekly: 'Last 7 Days', monthly: 'This Month', yearly: 'This Year' };
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -82,8 +97,15 @@ export default function Reports() {
         <p className="text-brand-gray">Track sales performance across different time periods</p>
       </div>
 
+      {(period === 'daily' || period === 'weekly') && (
+        <div className="bg-gradient-to-r from-brand-blue to-brand-teal text-white p-6 rounded-2xl mb-8 shadow-md">
+          <div className="text-white/80 font-medium mb-1 uppercase tracking-wider text-sm">Total Income {periodLabels[period]}</div>
+          <div className="font-heading text-4xl font-bold">₱{income.toLocaleString()}</div>
+        </div>
+      )}
+
       <div className="flex gap-2 mb-8 bg-brand-gray-light p-1 rounded-xl w-fit border border-brand-border">
-        {(['weekly', 'monthly', 'yearly'] as const).map(p => (
+        {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
           <button 
             key={p}
             className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${period === p ? 'bg-white text-brand-blue shadow-sm' : 'text-brand-gray hover:text-brand-dark'}`}
