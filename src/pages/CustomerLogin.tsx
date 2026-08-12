@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../lib/store';
 import { Droplets } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import bgImage from '../assets/login-bg.jpg';
+
 
 export default function CustomerLogin() {
   const [tab, setTab] = useState<'login' | 'signup'>('login');
@@ -69,7 +69,7 @@ export default function CustomerLogin() {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="flex-1 bg-gradient-to-br from-brand-blue-dark via-brand-blue to-brand-teal flex flex-col justify-center items-start p-10 md:p-16 relative overflow-hidden text-white bg-cover bg-center"
-        style={{ backgroundImage: `linear-gradient(to bottom right, rgba(13, 27, 42, 0.85), rgba(10, 110, 209, 0.6)), url(${bgImage})` }}
+        style={{ backgroundImage: `linear-gradient(to bottom right, rgba(13, 27, 42, 0.85), rgba(10, 110, 209, 0.6)), url(/login-bg.jpg.jpg)` }}
       >
         {/* Background shapes */}
         <div className="absolute w-[400px] h-[400px] rounded-full bg-white/5 -top-24 -right-24 blur-3xl animate-pulse" />
