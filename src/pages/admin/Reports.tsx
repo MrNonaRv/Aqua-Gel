@@ -14,24 +14,25 @@ export default function Reports() {
   const now = new Date();
   
   const getRange = (p: string) => {
-    let start;
+    let start, end;
     if (p === 'daily') {
-      start = new Date(now);
-      start.setHours(0, 0, 0, 0);
+      start = new Date(now); start.setHours(0, 0, 0, 0);
+      end = new Date(now); end.setHours(23, 59, 59, 999);
     } else if (p === 'weekly') {
-      start = new Date(now); 
-      start.setDate(now.getDate() - 6); 
-      start.setHours(0, 0, 0, 0);
+      start = new Date(now); start.setDate(now.getDate() - 6); start.setHours(0, 0, 0, 0);
+      end = new Date(now); end.setHours(23, 59, 59, 999);
     } else if (p === 'monthly') {
       start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     } else {
       start = new Date(now.getFullYear(), 0, 1);
+      end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
     }
-    return start.getTime();
+    return { start: start.getTime(), end: end.getTime() };
   };
 
-  const start = getRange(period);
-  const basePeriodOrders = orders.filter(o => o.date >= start);
+  const { start, end } = getRange(period);
+  const basePeriodOrders = orders.filter(o => o.date >= start && o.date <= end);
   const basePaid = basePeriodOrders.filter(o => o.paid);
 
   // Chart Data
@@ -73,12 +74,21 @@ export default function Reports() {
     });
   } else if (period === 'monthly') {
     chartTitle = 'Income by Week (This Month)';
-    const weeks = [1, 8, 15, 22, 29];
+    const weeks = [1, 8, 15, 22];
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    if (daysInMonth > 28) weeks.push(29);
+
     chartData = weeks.map((w, i) => {
       const ws = new Date(now.getFullYear(), now.getMonth(), w).getTime();
-      const we = new Date(now.getFullYear(), now.getMonth(), weeks[i+1] || 32).getTime();
-      const total = basePaid.filter(o => o.date >= ws && o.date < we).reduce((s, o) => s + o.total, 0);
-      return { name: `Week ${i+1}`, total, startMs: ws, endMs: we - 1 };
+      let weMs;
+      if (i === weeks.length - 1) {
+        weMs = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime(); // 1st of next month
+      } else {
+        weMs = new Date(now.getFullYear(), now.getMonth(), weeks[i+1]).getTime();
+      }
+      
+      const total = basePaid.filter(o => o.date >= ws && o.date < weMs).reduce((s, o) => s + o.total, 0);
+      return { name: `Week ${i+1}`, total, startMs: ws, endMs: weMs - 1 };
     });
   } else {
     chartTitle = 'Income by Month (This Year)';
