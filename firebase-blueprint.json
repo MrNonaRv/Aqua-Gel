@@ -1,0 +1,54 @@
+{
+  "collections": [
+    {
+      "name": "users",
+      "description": "User accounts, including both customers and admins.",
+      "fields": [
+        { "name": "role", "type": "string", "description": "'admin' or 'customer'" },
+        { "name": "name", "type": "string" },
+        { "name": "username", "type": "string" },
+        { "name": "phone", "type": "string" },
+        { "name": "address", "type": "string" },
+        { "name": "unpaid", "type": "number" }
+      ]
+    },
+    {
+      "name": "orders",
+      "description": "Customer orders",
+      "fields": [
+        { "name": "customerId", "type": "string" },
+        { "name": "customerName", "type": "string" },
+        { "name": "type", "type": "string" },
+        { "name": "qty", "type": "number" },
+        { "name": "method", "type": "string" },
+        { "name": "paymentMethod", "type": "string" },
+        { "name": "referenceNumber", "type": "string" },
+        { "name": "status", "type": "string" },
+        { "name": "total", "type": "number" },
+        { "name": "paid", "type": "boolean" },
+        { "name": "date", "type": "number" },
+        { "name": "paidDate", "type": "number" },
+        { "name": "personnel", "type": "string" },
+        { "name": "address", "type": "string" },
+        { "name": "containerReturn", "type": "boolean" }
+      ]
+    },
+    {
+      "name": "config",
+      "description": "Global settings and config singletons",
+      "fields": [
+        { "name": "inventory", "type": "map" },
+        { "name": "personnel", "type": "array" },
+        { "name": "settings", "type": "map" }
+      ]
+    },
+    {
+      "name": "stockLog",
+      "description": "Logs for stock changes",
+      "fields": [
+        { "name": "msg", "type": "string" },
+        { "name": "time", "type": "number" }
+      ]
+    }
+  ]
+}

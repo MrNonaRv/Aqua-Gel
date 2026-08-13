@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
 export type Role = 'admin' | 'customer';
 
@@ -117,80 +119,57 @@ function getInitialState<T>(key: string, defaultValue: T): T {
 
   
   useEffect(() => {
-    // Shift mock dates to current week so they don't age out during preview
-    const shifted = localStorage.getItem('ag_mock_shifted');
-    if (!shifted) {
-      const stored = localStorage.getItem('ag_orders');
-      if (stored && stored !== 'undefined') {
+    // Migrate localStorage to Firebase on first load
+    const migrateToFirebase = async () => {
+      const collections = [
+        { key: 'session', localKey: 'ag_session', default: null },
+        { key: 'customers', localKey: 'ag_customers', default: SEED_CUSTOMERS },
+        { key: 'orders', localKey: 'ag_orders', default: SEED_ORDERS },
+        { key: 'inventory', localKey: 'ag_inventory', default: SEED_INVENTORY },
+        { key: 'personnel', localKey: 'ag_personnel', default: SEED_PERSONNEL },
+        { key: 'stocklog', localKey: 'ag_stocklog', default: [] },
+        { key: 'settings', localKey: 'ag_settings', default: SEED_SETTINGS }
+      ];
+
+      for (const col of collections) {
         try {
-          const parsed = JSON.parse(stored);
-          const now = Date.now();
-          const maxDate = Math.max(...parsed.map(o => o.date));
-          const diff = now - maxDate;
-          if (diff > 86400000) {
-            const updated = parsed.map(o => ({...o, date: o.date + diff, paidDate: o.paidDate ? o.paidDate + diff : undefined}));
-            localStorage.setItem('ag_orders', JSON.stringify(updated));
-            localStorage.setItem('ag_mock_shifted', 'true');
+          const d = await getDoc(doc(db, 'store', col.key));
+          if (!d.exists()) {
+            const local = localStorage.getItem(col.localKey);
+            let val = col.default;
+            if (local && local !== 'undefined') {
+              try { val = JSON.parse(local); } catch(e) {}
+            }
+            await setDoc(doc(db, 'store', col.key), { value: val });
           }
-        } catch(e) {}
+        } catch (err) {
+          console.error("Migration error for", col.key, err);
+        }
       }
-    }
-
-    // Cleanup any lingering 'undefined' in localStorage
-    ['ag_session', 'ag_customers', 'ag_orders', 'ag_inventory', 'ag_personnel', 'ag_stocklog', 'ag_settings'].forEach(key => {
-      if (localStorage.getItem(key) === 'undefined') {
-        localStorage.removeItem(key);
-      }
-    });
-
-    // Load state from local storage or seed initial data
-    const sSession = localStorage.getItem('ag_session');
-    if (sSession && sSession !== 'undefined') { try { _setSession(JSON.parse(sSession)); } catch (e) { console.error('Failed to parse sSession', e); } }
-
-    const sCustomers = localStorage.getItem('ag_customers');
-    if (sCustomers && sCustomers !== 'undefined') { try { _setCustomers(JSON.parse(sCustomers)); } catch (e) { console.error('Failed to parse sCustomers', e); } }
-    else { _setCustomers(SEED_CUSTOMERS); localStorage.setItem('ag_customers', JSON.stringify(SEED_CUSTOMERS)); }
-
-    const sOrders = localStorage.getItem('ag_orders');
-    if (sOrders && sOrders !== 'undefined') { try { _setOrders(JSON.parse(sOrders)); } catch (e) { console.error('Failed to parse sOrders', e); } }
-    else { _setOrders(SEED_ORDERS); localStorage.setItem('ag_orders', JSON.stringify(SEED_ORDERS)); }
-
-    const sInv = localStorage.getItem('ag_inventory');
-    if (sInv && sInv !== 'undefined') { try { _setInventory(JSON.parse(sInv)); } catch (e) { console.error('Failed to parse sInv', e); } }
-    else { _setInventory(SEED_INVENTORY); localStorage.setItem('ag_inventory', JSON.stringify(SEED_INVENTORY)); }
-
-    const sPers = localStorage.getItem('ag_personnel');
-    if (sPers && sPers !== 'undefined') { try { _setPersonnel(JSON.parse(sPers)); } catch (e) { console.error('Failed to parse sPers', e); } }
-    else { _setPersonnel(SEED_PERSONNEL); localStorage.setItem('ag_personnel', JSON.stringify(SEED_PERSONNEL)); }
-
-    const sLog = localStorage.getItem('ag_stocklog');
-    if (sLog && sLog !== 'undefined') { try { _setStockLog(JSON.parse(sLog)); } catch (e) { console.error('Failed to parse sLog', e); } }
-    
-    const sSettings = localStorage.getItem('ag_settings');
-    if (sSettings && sSettings !== 'undefined') { try { _setSettings(JSON.parse(sSettings)); } catch (e) { console.error('Failed to parse sSettings', e); } }
-    else { _setSettings(SEED_SETTINGS); localStorage.setItem('ag_settings', JSON.stringify(SEED_SETTINGS)); }
-    
-    const syncState = (e: StorageEvent) => {
-      if (e.key === 'ag_session' && e.newValue && e.newValue !== 'undefined') { try { _setSession(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_session', e); } }
-      if (e.key === 'ag_customers' && e.newValue && e.newValue !== 'undefined') { try { _setCustomers(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_customers', e); } }
-      if (e.key === 'ag_orders' && e.newValue && e.newValue !== 'undefined') { try { _setOrders(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_orders', e); } }
-      if (e.key === 'ag_inventory' && e.newValue && e.newValue !== 'undefined') { try { _setInventory(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_inventory', e); } }
-      if (e.key === 'ag_personnel' && e.newValue && e.newValue !== 'undefined') { try { _setPersonnel(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_personnel', e); } }
-      if (e.key === 'ag_stocklog' && e.newValue && e.newValue !== 'undefined') { try { _setStockLog(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_stocklog', e); } }
-      if (e.key === 'ag_settings' && e.newValue && e.newValue !== 'undefined') { try { _setSettings(JSON.parse(e.newValue)); } catch (e) { console.error('Failed to parse ag_settings', e); } }
     };
+    
+    migrateToFirebase();
 
-    window.addEventListener('storage', syncState);
-    return () => window.removeEventListener('storage', syncState);
+    const unsubSession = onSnapshot(doc(db, 'store', 'session'), (d) => { if (d.exists()) { _setSession(d.data().value); localStorage.setItem('ag_session', JSON.stringify(d.data().value)); } });
+    const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), (d) => { if (d.exists()) { _setCustomers(d.data().value); localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); } });
+    const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), (d) => { if (d.exists()) { _setOrders(d.data().value); localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); } });
+    const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), (d) => { if (d.exists()) { _setInventory(d.data().value); localStorage.setItem('ag_inventory', JSON.stringify(d.data().value)); } });
+    const unsubPersonnel = onSnapshot(doc(db, 'store', 'personnel'), (d) => { if (d.exists()) { _setPersonnel(d.data().value); localStorage.setItem('ag_personnel', JSON.stringify(d.data().value)); } });
+    const unsubStockLog = onSnapshot(doc(db, 'store', 'stocklog'), (d) => { if (d.exists()) { _setStockLog(d.data().value); localStorage.setItem('ag_stocklog', JSON.stringify(d.data().value)); } });
+    const unsubSettings = onSnapshot(doc(db, 'store', 'settings'), (d) => { if (d.exists()) { _setSettings(d.data().value); localStorage.setItem('ag_settings', JSON.stringify(d.data().value)); } });
+
+    return () => {
+      unsubSession(); unsubCustomers(); unsubOrders(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
+    };
   }, []);
 
-  const setSession = (s: User | null) => { _setSession(s); localStorage.setItem('ag_session', JSON.stringify(s || {})); };
-  const setCustomers = (c: Customer[]) => { _setCustomers(c); localStorage.setItem('ag_customers', JSON.stringify(c)); };
-  const setOrders = (o: Order[]) => { _setOrders(o); localStorage.setItem('ag_orders', JSON.stringify(o)); };
-  const setInventory = (i: Inventory) => { _setInventory(i); localStorage.setItem('ag_inventory', JSON.stringify(i)); };
-  const setPersonnel = (p: string[]) => { _setPersonnel(p); localStorage.setItem('ag_personnel', JSON.stringify(p)); };
-  const setStockLog = (l: { msg: string; time: number }[]) => { _setStockLog(l); localStorage.setItem('ag_stocklog', JSON.stringify(l)); };
-  const setSettings = (s: Settings) => { _setSettings(s); localStorage.setItem('ag_settings', JSON.stringify(s)); };
+  const setSession = (s: User | null) => { _setSession(s); setDoc(doc(db, 'store', 'session'), { value: s }); };
+  const setCustomers = (c: Customer[]) => { _setCustomers(c); setDoc(doc(db, 'store', 'customers'), { value: c }); };
+  const setOrders = (o: Order[]) => { _setOrders(o); setDoc(doc(db, 'store', 'orders'), { value: o }); };
+  const setInventory = (i: Inventory) => { _setInventory(i); setDoc(doc(db, 'store', 'inventory'), { value: i }); };
+  const setPersonnel = (p: string[]) => { _setPersonnel(p); setDoc(doc(db, 'store', 'personnel'), { value: p }); };
+  const setStockLog = (l: { msg: string; time: number }[]) => { _setStockLog(l); setDoc(doc(db, 'store', 'stocklog'), { value: l }); };
+  const setSettings = (s: Settings) => { _setSettings(s); setDoc(doc(db, 'store', 'settings'), { value: s }); };
 
   const updateCustomerBalance = (customerId: string, amountChange: number) => {
     const newCustomers = customers.map(c => 
