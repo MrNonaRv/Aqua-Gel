@@ -122,8 +122,7 @@ function getInitialState<T>(key: string, defaultValue: T): T {
     // Migrate localStorage to Firebase on first load
     const migrateToFirebase = async () => {
       const collections = [
-        { key: 'session', localKey: 'ag_session', default: null },
-        { key: 'customers', localKey: 'ag_customers', default: SEED_CUSTOMERS },
+                { key: 'customers', localKey: 'ag_customers', default: SEED_CUSTOMERS },
         { key: 'orders', localKey: 'ag_orders', default: SEED_ORDERS },
         { key: 'inventory', localKey: 'ag_inventory', default: SEED_INVENTORY },
         { key: 'personnel', localKey: 'ag_personnel', default: SEED_PERSONNEL },
@@ -150,8 +149,7 @@ function getInitialState<T>(key: string, defaultValue: T): T {
     
     migrateToFirebase();
 
-    const unsubSession = onSnapshot(doc(db, 'store', 'session'), (d) => { if (d.exists()) { _setSession(d.data().value); localStorage.setItem('ag_session', JSON.stringify(d.data().value)); } });
-    const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), (d) => { if (d.exists()) { _setCustomers(d.data().value); localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); } });
+        const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), (d) => { if (d.exists()) { _setCustomers(d.data().value); localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); } });
     const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), (d) => { if (d.exists()) { _setOrders(d.data().value); localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); } });
     const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), (d) => { if (d.exists()) { _setInventory(d.data().value); localStorage.setItem('ag_inventory', JSON.stringify(d.data().value)); } });
     const unsubPersonnel = onSnapshot(doc(db, 'store', 'personnel'), (d) => { if (d.exists()) { _setPersonnel(d.data().value); localStorage.setItem('ag_personnel', JSON.stringify(d.data().value)); } });
@@ -159,12 +157,12 @@ function getInitialState<T>(key: string, defaultValue: T): T {
     const unsubSettings = onSnapshot(doc(db, 'store', 'settings'), (d) => { if (d.exists()) { _setSettings(d.data().value); localStorage.setItem('ag_settings', JSON.stringify(d.data().value)); } });
 
     return () => {
-      unsubSession(); unsubCustomers(); unsubOrders(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
+      unsubCustomers(); unsubOrders(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
     };
   }, []);
 
   const cleanData = (data: any) => JSON.parse(JSON.stringify(data));
-  const setSession = (s: User | null) => { _setSession(s); setDoc(doc(db, 'store', 'session'), { value: cleanData(s) }); };
+  const setSession = (s: User | null) => { _setSession(s); localStorage.setItem('ag_session', JSON.stringify(s)); };
   const setCustomers = (c: Customer[]) => { _setCustomers(c); setDoc(doc(db, 'store', 'customers'), { value: cleanData(c) }); };
   const setOrders = (o: Order[]) => { _setOrders(o); setDoc(doc(db, 'store', 'orders'), { value: cleanData(o) }); };
   const setInventory = (i: Inventory) => { _setInventory(i); setDoc(doc(db, 'store', 'inventory'), { value: cleanData(i) }); };
