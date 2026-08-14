@@ -140,7 +140,7 @@ function getInitialState<T>(key: string, defaultValue: T): T {
             if (local && local !== 'undefined') {
               try { val = JSON.parse(local); } catch(e) {}
             }
-            await setDoc(doc(db, 'store', col.key), { value: val });
+            await setDoc(doc(db, 'store', col.key), { value: cleanData(val) });
           }
         } catch (err) {
           console.error("Migration error for", col.key, err);
@@ -163,13 +163,14 @@ function getInitialState<T>(key: string, defaultValue: T): T {
     };
   }, []);
 
-  const setSession = (s: User | null) => { _setSession(s); setDoc(doc(db, 'store', 'session'), { value: s }); };
-  const setCustomers = (c: Customer[]) => { _setCustomers(c); setDoc(doc(db, 'store', 'customers'), { value: c }); };
-  const setOrders = (o: Order[]) => { _setOrders(o); setDoc(doc(db, 'store', 'orders'), { value: o }); };
-  const setInventory = (i: Inventory) => { _setInventory(i); setDoc(doc(db, 'store', 'inventory'), { value: i }); };
-  const setPersonnel = (p: string[]) => { _setPersonnel(p); setDoc(doc(db, 'store', 'personnel'), { value: p }); };
-  const setStockLog = (l: { msg: string; time: number }[]) => { _setStockLog(l); setDoc(doc(db, 'store', 'stocklog'), { value: l }); };
-  const setSettings = (s: Settings) => { _setSettings(s); setDoc(doc(db, 'store', 'settings'), { value: s }); };
+  const cleanData = (data: any) => JSON.parse(JSON.stringify(data));
+  const setSession = (s: User | null) => { _setSession(s); setDoc(doc(db, 'store', 'session'), { value: cleanData(s) }); };
+  const setCustomers = (c: Customer[]) => { _setCustomers(c); setDoc(doc(db, 'store', 'customers'), { value: cleanData(c) }); };
+  const setOrders = (o: Order[]) => { _setOrders(o); setDoc(doc(db, 'store', 'orders'), { value: cleanData(o) }); };
+  const setInventory = (i: Inventory) => { _setInventory(i); setDoc(doc(db, 'store', 'inventory'), { value: cleanData(i) }); };
+  const setPersonnel = (p: string[]) => { _setPersonnel(p); setDoc(doc(db, 'store', 'personnel'), { value: cleanData(p) }); };
+  const setStockLog = (l: { msg: string; time: number }[]) => { _setStockLog(l); setDoc(doc(db, 'store', 'stocklog'), { value: cleanData(l) }); };
+  const setSettings = (s: Settings) => { _setSettings(s); setDoc(doc(db, 'store', 'settings'), { value: cleanData(s) }); };
 
   const updateCustomerBalance = (customerId: string, amountChange: number) => {
     const newCustomers = customers.map(c => 
