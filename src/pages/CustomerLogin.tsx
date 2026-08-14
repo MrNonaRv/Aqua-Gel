@@ -86,7 +86,7 @@ export default function CustomerLogin() {
           </div>
           <div>
             <div className="font-heading font-extrabold text-2xl leading-tight">Aqua Gel</div>
-            <div className="text-sm opacity-80">Water Station Management</div>
+            <div className="text-sm opacity-80">Water Refilling Station Management</div>
           </div>
         </motion.div>
 
@@ -102,29 +102,10 @@ export default function CustomerLogin() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-lg text-white/80 z-10 max-w-[420px] mb-12"
+          className="text-lg text-white/80 z-10 max-w-[420px]"
         >
           A complete ordering and inventory management system for your water station.
         </motion.p>
-
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="flex flex-col gap-4 z-10 text-white/90"
-        >
-          {['Online ordering', 'Detailed income reports', 'Balance monitoring', 'Inventory management'].map((txt, i) => (
-            <motion.div 
-              key={i} 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7 + i * 0.1 }}
-              className="flex items-center gap-3"
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-[#7de4d8] shadow-[0_0_10px_rgba(125,228,216,0.6)]" /> {txt}
-            </motion.div>
-          ))}
-        </motion.div>
       </motion.div>
 
       <motion.div 
