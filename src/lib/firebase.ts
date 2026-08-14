@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: "automatic-climate-zgxqk",
@@ -11,4 +11,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, "ai-studio-aquagel-2d88a1e5-4ed7-4732-9645-6b7bdda0a437");
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true
+}, "ai-studio-aquagel-2d88a1e5-4ed7-4732-9645-6b7bdda0a437");
