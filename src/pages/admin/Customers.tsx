@@ -18,11 +18,11 @@ export default function Customers() {
     return true;
   });
 
-  const handleAdjustBalance = () => {
+  const handleRecordPayment = () => {
     if (!viewCust) return;
     const amt = parseFloat(adjAmount);
     if (isNaN(amt)) return;
-    setCustomers(customers.map(c => c.id === viewCust.id ? { ...c, unpaid: Math.max(0, amt) } : c));
+    setCustomers(customers.map(c => c.id === viewCust.id ? { ...c, unpaid: Math.max(0, c.unpaid - amt) } : c));
     setViewCust(null);
     setAdjAmount('');
   };
@@ -176,17 +176,17 @@ export default function Customers() {
                   </div>
 
                   <div className="pt-4 border-t border-brand-border">
-                    <label className="block text-sm font-medium mb-2">Adjust Unpaid Balance</label>
+                    <label className="block text-sm font-medium mb-2">Record Payment</label>
                     <div className="flex gap-2">
                       <input 
                         type="number" 
                         className="form-control flex-1" 
-                        placeholder="Amount (₱)" 
+                        placeholder="Payment Amount (₱)" 
                         value={adjAmount}
                         onChange={e => setAdjAmount(e.target.value)}
                         min="0"
                       />
-                      <button className="btn btn-primary whitespace-nowrap" onClick={handleAdjustBalance}>Update</button>
+                      <button className="btn btn-primary whitespace-nowrap" onClick={handleRecordPayment}>Apply Payment</button>
                     </div>
                   </div>
                 </>
