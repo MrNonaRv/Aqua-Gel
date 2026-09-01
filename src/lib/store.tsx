@@ -149,12 +149,30 @@ function getInitialState<T>(key: string, defaultValue: T): T {
     
     migrateToFirebase();
 
-        const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), (d) => { if (d.exists()) { _setCustomers(d.data().value); localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); } });
-    const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), (d) => { if (d.exists()) { _setOrders(d.data().value); localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); } });
-    const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), (d) => { if (d.exists()) { _setInventory(d.data().value); localStorage.setItem('ag_inventory', JSON.stringify(d.data().value)); } });
-    const unsubPersonnel = onSnapshot(doc(db, 'store', 'personnel'), (d) => { if (d.exists()) { _setPersonnel(d.data().value); localStorage.setItem('ag_personnel', JSON.stringify(d.data().value)); } });
-    const unsubStockLog = onSnapshot(doc(db, 'store', 'stocklog'), (d) => { if (d.exists()) { _setStockLog(d.data().value); localStorage.setItem('ag_stocklog', JSON.stringify(d.data().value)); } });
-    const unsubSettings = onSnapshot(doc(db, 'store', 'settings'), (d) => { if (d.exists()) { _setSettings(d.data().value); localStorage.setItem('ag_settings', JSON.stringify(d.data().value)); } });
+    const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), 
+      (d) => { if (d.exists() && d.data().value) { _setCustomers(d.data().value); localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); } },
+      (err) => console.error("Firestore onSnapshot error (customers):", err)
+    );
+    const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), 
+      (d) => { if (d.exists() && d.data().value) { _setOrders(d.data().value); localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); } },
+      (err) => console.error("Firestore onSnapshot error (orders):", err)
+    );
+    const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), 
+      (d) => { if (d.exists() && d.data().value) { _setInventory(d.data().value); localStorage.setItem('ag_inventory', JSON.stringify(d.data().value)); } },
+      (err) => console.error("Firestore onSnapshot error (inventory):", err)
+    );
+    const unsubPersonnel = onSnapshot(doc(db, 'store', 'personnel'), 
+      (d) => { if (d.exists() && d.data().value) { _setPersonnel(d.data().value); localStorage.setItem('ag_personnel', JSON.stringify(d.data().value)); } },
+      (err) => console.error("Firestore onSnapshot error (personnel):", err)
+    );
+    const unsubStockLog = onSnapshot(doc(db, 'store', 'stocklog'), 
+      (d) => { if (d.exists() && d.data().value) { _setStockLog(d.data().value); localStorage.setItem('ag_stocklog', JSON.stringify(d.data().value)); } },
+      (err) => console.error("Firestore onSnapshot error (stocklog):", err)
+    );
+    const unsubSettings = onSnapshot(doc(db, 'store', 'settings'), 
+      (d) => { if (d.exists() && d.data().value) { _setSettings(d.data().value); localStorage.setItem('ag_settings', JSON.stringify(d.data().value)); } },
+      (err) => console.error("Firestore onSnapshot error (settings):", err)
+    );
 
     return () => {
       unsubCustomers(); unsubOrders(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();

@@ -37,8 +37,11 @@ export default function CustomerPortal() {
   const total = unitPrice * qty;
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentProcessed, setPaymentProcessed] = useState(false);
 
   useEffect(() => {
+    if (paymentProcessed) return;
+
     // Handle return from PayMongo
     const params = new URLSearchParams(window.location.search);
     const isSuccess = params.get('payment_success');
@@ -46,32 +49,40 @@ export default function CustomerPortal() {
 
     if (isSuccess === 'true' && orderId) {
       if (orderId.startsWith('balance_')) {
-        // Find customer and update balance
         const custId = orderId.split('_')[1];
-        setCustomers(customers.map(c => c.id === custId ? { ...c, unpaid: 0 } : c));
-        // Mark all unpaid orders for this customer as paid
-        setOrders(orders.map(o => (o.customerId === custId && !o.paid) ? { ...o, paid: true, paidDate: Date.now() } : o));
-        setOrderSuccess('✅ Outstanding balance successfully paid via GCash!');
-        setTab('paymenthistory');
-        setTimeout(() => setOrderSuccess(''), 5000);
-        window.history.replaceState({}, document.title, window.location.pathname);
+        // Wait until customers and orders are loaded from Firestore
+        if (customers.length > 0) {
+          const custExists = customers.some(c => c.id === custId);
+          if (custExists) {
+            setCustomers(customers.map(c => c.id === custId ? { ...c, unpaid: 0 } : c));
+            setOrders(orders.map(o => (o.customerId === custId && !o.paid) ? { ...o, paid: true, paidDate: Date.now() } : o));
+            setOrderSuccess('✅ Outstanding balance successfully paid via GCash!');
+            setTab('payments');
+            setPaymentProcessed(true);
+            setTimeout(() => setOrderSuccess(''), 5000);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        }
         return;
       }
-      // Find order and mark as paid
-      const order = orders.find(o => o.id === orderId);
-      if (order && !order.paid) {
-        setOrders(orders.map(o => o.id === orderId ? { ...o, paid: true, paidDate: Date.now() } : o));
-        setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, c.unpaid - order.total) } : c));
-        setOrderSuccess(`✅ Payment successful via PayMongo! Order ${orderId} is now paid.`);
-        setTab('myorders');
-        setTimeout(() => setOrderSuccess(''), 5000);
+
+      // Wait until orders are loaded from Firestore
+      if (orders.length > 0) {
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          if (!order.paid) {
+            setOrders(orders.map(o => o.id === orderId ? { ...o, paid: true, paidDate: Date.now() } : o));
+            setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, c.unpaid - order.total) } : c));
+            setOrderSuccess(`✅ Payment successful via PayMongo! Order ${orderId} is now paid.`);
+          }
+          setTab('myorders');
+          setPaymentProcessed(true);
+          setTimeout(() => setOrderSuccess(''), 5000);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       }
-      
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [customers, orders, paymentProcessed, setCustomers, setOrders]);
 
   
   const payOutstandingBalance = async () => {
