@@ -25,6 +25,8 @@ export default function Orders() {
   const [walkInType, setWalkInType] = useState<'slim' | 'round'>('slim');
   const [walkInQty, setWalkInQty] = useState(1);
   const [walkInPaid, setWalkInPaid] = useState(true);
+  const [walkInMethod, setWalkInMethod] = useState<'pickup' | 'delivery'>('pickup');
+  const [walkInAddress, setWalkInAddress] = useState('');
   const [walkInPaidDate, setWalkInPaidDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -39,6 +41,8 @@ export default function Orders() {
     setWalkInType('slim');
     setWalkInQty(1);
     setWalkInPaid(true);
+    setWalkInMethod('pickup');
+    setWalkInAddress('');
     
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -86,15 +90,15 @@ export default function Orders() {
       customerName: customerName,
       type: walkInType,
       qty: walkInQty,
-      method: 'pickup',
+      method: walkInMethod,
       paymentMethod: 'cash',
-      status: 'Delivered', // Walk-in is processed instantly
+      status: walkInMethod === 'pickup' ? 'Delivered' : 'Pending',
       total: total,
       paid: walkInPaid,
       paidDate: walkInPaid ? new Date(walkInPaidDate).getTime() : undefined,
       date: Date.now(),
       personnel: null,
-      address: null,
+      address: walkInMethod === 'delivery' ? walkInAddress : null,
       containerReturn: false,
     };
 
@@ -314,7 +318,7 @@ export default function Orders() {
             >
               ×
             </button>
-            <h3 className="font-heading text-2xl font-black text-center mb-6 text-slate-800">Walk in Order</h3>
+            <h3 className="font-heading text-2xl font-black text-center mb-6 text-slate-800">New Order</h3>
             
             <div className="space-y-4">
               <div>
@@ -386,6 +390,36 @@ export default function Orders() {
                   </button>
                 </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Method</label>
+                <div className="relative">
+                  <select 
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800 bg-white outline-none focus:border-slate-800 appearance-none shadow-xs"
+                    value={walkInMethod} 
+                    onChange={e => setWalkInMethod(e.target.value as any)}
+                  >
+                    <option value="pickup">Pick-up / Walk-in</option>
+                    <option value="delivery">Delivery</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
+                </div>
+              </div>
+
+              {walkInMethod === 'delivery' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Delivery Address</label>
+                  <input 
+                    type="text"
+                    className="w-full rounded-full border-[2px] border-slate-300 px-5 py-3 text-sm font-semibold text-slate-800 bg-white outline-none focus:border-slate-800 shadow-xs"
+                    placeholder="Enter delivery address"
+                    value={walkInAddress}
+                    onChange={e => setWalkInAddress(e.target.value)}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Total</label>

@@ -181,12 +181,22 @@ function getInitialState<T>(key: string, defaultValue: T): T {
 
   const cleanData = (data: any) => JSON.parse(JSON.stringify(data));
   const setSession = (s: User | null) => { _setSession(s); localStorage.setItem('ag_session', JSON.stringify(s)); };
-  const setCustomers = (c: Customer[]) => { _setCustomers(c); setDoc(doc(db, 'store', 'customers'), { value: cleanData(c) }); };
-  const setOrders = (o: Order[]) => { _setOrders(o); setDoc(doc(db, 'store', 'orders'), { value: cleanData(o) }); };
-  const setInventory = (i: Inventory) => { _setInventory(i); setDoc(doc(db, 'store', 'inventory'), { value: cleanData(i) }); };
-  const setPersonnel = (p: string[]) => { _setPersonnel(p); setDoc(doc(db, 'store', 'personnel'), { value: cleanData(p) }); };
-  const setStockLog = (l: { msg: string; time: number }[]) => { _setStockLog(l); setDoc(doc(db, 'store', 'stocklog'), { value: cleanData(l) }); };
-  const setSettings = (s: Settings) => { _setSettings(s); setDoc(doc(db, 'store', 'settings'), { value: cleanData(s) }); };
+  
+  const safeSetDoc = (docRef: any, data: any) => {
+    setDoc(docRef, data).catch(err => {
+      console.error("Firestore Write Failed:", err);
+      if (err.code === 'resource-exhausted') {
+        alert("CRITICAL ERROR: Firebase daily quota limit exceeded. Sync is paused until the limit resets.");
+      }
+    });
+  };
+
+  const setCustomers = (c: Customer[]) => { _setCustomers(c); safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c) }); };
+  const setOrders = (o: Order[]) => { _setOrders(o); safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o) }); };
+  const setInventory = (i: Inventory) => { _setInventory(i); safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(i) }); };
+  const setPersonnel = (p: string[]) => { _setPersonnel(p); safeSetDoc(doc(db, 'store', 'personnel'), { value: cleanData(p) }); };
+  const setStockLog = (l: { msg: string; time: number }[]) => { _setStockLog(l); safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(l) }); };
+  const setSettings = (s: Settings) => { _setSettings(s); safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(s) }); };
 
   const updateCustomerBalance = (customerId: string, amountChange: number) => {
     const newCustomers = customers.map(c => 
