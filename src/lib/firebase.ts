@@ -13,4 +13,4 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
-}, "ai-studio-aquagel-2d88a1e5-4ed7-4732-9645-6b7bdda0a437");
+}, "aquagel-db-v2");

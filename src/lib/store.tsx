@@ -1,6 +1,11 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
+import { doc, onSnapshot, setDoc, setLogLevel } from 'firebase/firestore';
 import { db } from './firebase';
+
+// Suppress excessive console debug logs from Firestore internal backoff
+try {
+  setLogLevel('silent');
+} catch (e) {}
 
 export type Role = 'admin' | 'customer';
 
@@ -69,134 +74,165 @@ interface StoreContextType {
   settings: Settings;
   setSettings: (settings: Settings) => void;
   updateCustomerBalance: (customerId: string, amountChange: number) => void;
+  quotaWarning: boolean;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
-const SEED_CUSTOMERS: Customer[] = [
-  { id: 'c1', name: 'Maria Santos', username: 'maria', password: 'maria123', phone: '09171234567', address: 'Brgy. Poblacion, Numancia, Aklan', unpaid: 150, totalGallons: 5, isLoyal: false, role: 'customer' },
-  { id: 'c2', name: 'Jose Reyes', username: 'jose', password: 'jose123', phone: '09281234567', address: 'Purok 3, Numancia, Aklan', unpaid: 0, totalGallons: 3, isLoyal: false, role: 'customer' },
-  { id: 'c3', name: 'Ana Cruz', username: 'ana', password: 'ana123', phone: '09391234567', address: 'Brgy. Union, Numancia, Aklan', unpaid: 75, totalGallons: 3, isLoyal: false, role: 'customer' },
-];
-
-const now = Date.now();
-const day = 86400000;
-const SEED_ORDERS: Order[] = [
-  { id: 'o1', customerId: 'c1', customerName: 'Maria Santos', type: 'round', qty: 2, method: 'delivery', status: 'Delivered', total: 80, paid: true, date: now - 2*day, personnel: 'Jun Dela Cruz', address: 'Brgy. Poblacion, Numancia, Aklan', containerReturn: true },
-  { id: 'o2', customerId: 'c2', customerName: 'Jose Reyes', type: 'slim', qty: 1, method: 'pickup', status: 'Delivered', total: 35, paid: true, date: now - day, personnel: null, address: null, containerReturn: false },
-  { id: 'o3', customerId: 'c3', customerName: 'Ana Cruz', type: 'slim', qty: 2, method: 'delivery', status: 'Out for Delivery', total: 70, paid: false, date: now - 3600000, personnel: 'Roel Bautista', address: 'Brgy. Union, Numancia, Aklan', containerReturn: false },
-  { id: 'o4', customerId: 'c1', customerName: 'Maria Santos', type: 'round', qty: 3, method: 'delivery', status: 'Pending', total: 120, paid: false, date: now - 1800000, personnel: null, address: 'Brgy. Poblacion, Numancia, Aklan', containerReturn: false },
-  { id: 'o5', customerId: 'c2', customerName: 'Jose Reyes', type: 'round', qty: 2, method: 'delivery', status: 'Delivered', total: 80, paid: true, date: now - 5*day, personnel: 'Jun Dela Cruz', address: 'Purok 3, Numancia, Aklan', containerReturn: true },
-  { id: 'o6', customerId: 'c3', customerName: 'Ana Cruz', type: 'slim', qty: 3, method: 'delivery', status: 'Delivered', total: 105, paid: false, date: now - 7*day, personnel: 'Roel Bautista', address: 'Brgy. Union, Numancia, Aklan', containerReturn: false },
-];
-
-const SEED_INVENTORY: Inventory = { slim: 45, round: 28, priceSlim: 35, priceRound: 40 };
-const SEED_PERSONNEL = ['Jun Dela Cruz', 'Roel Bautista', 'Mark Flores'];
-const SEED_SETTINGS: Settings = {
-  gcashName: 'Aqua Gel Station',
-  gcashNumber: '0917-123-4567',
-  qrCodeUrl: ''
-};
+import { 
+  SEED_CUSTOMERS, 
+  SEED_ORDERS, 
+  SEED_INVENTORY, 
+  SEED_PERSONNEL, 
+  SEED_STOCKLOG, 
+  SEED_SETTINGS 
+} from './seeds';
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  
-function getInitialState<T>(key: string, defaultValue: T): T {
-  if (typeof window === 'undefined') return defaultValue;
-  const val = localStorage.getItem(key);
-  if (val && val !== 'undefined') {
-    try { return JSON.parse(val); } catch(e) {}
+  function getInitialState<T>(key: string, defaultValue: T): T {
+    if (typeof window === 'undefined') return defaultValue;
+    const val = localStorage.getItem(key);
+    if (val && val !== 'undefined') {
+      try { return JSON.parse(val); } catch(e) {}
+    }
+    return defaultValue;
   }
-  return defaultValue;
-}
 
   const [session, _setSession] = useState<User | null>(() => getInitialState('ag_session', null));
   const [customers, _setCustomers] = useState<Customer[]>(() => getInitialState('ag_customers', SEED_CUSTOMERS));
   const [orders, _setOrders] = useState<Order[]>(() => getInitialState('ag_orders', SEED_ORDERS));
   const [inventory, _setInventory] = useState<Inventory>(() => getInitialState('ag_inventory', SEED_INVENTORY));
   const [personnel, _setPersonnel] = useState<string[]>(() => getInitialState('ag_personnel', SEED_PERSONNEL));
-  const [stockLog, _setStockLog] = useState<{ msg: string; time: number }[]>(() => getInitialState('ag_stocklog', []));
+  const [stockLog, _setStockLog] = useState<{ msg: string; time: number }[]>(() => getInitialState('ag_stocklog', SEED_STOCKLOG));
   const [settings, _setSettings] = useState<Settings>(() => getInitialState('ag_settings', SEED_SETTINGS));
+  const [quotaWarning, setQuotaWarning] = useState<boolean>(false);
+  const syncChannelRef = useRef<BroadcastChannel | null>(null);
 
-  
   useEffect(() => {
-    // Migrate localStorage to Firebase on first load
-    const migrateToFirebase = async () => {
-      const collections = [
-                { key: 'customers', localKey: 'ag_customers', default: SEED_CUSTOMERS },
-        { key: 'orders', localKey: 'ag_orders', default: SEED_ORDERS },
-        { key: 'inventory', localKey: 'ag_inventory', default: SEED_INVENTORY },
-        { key: 'personnel', localKey: 'ag_personnel', default: SEED_PERSONNEL },
-        { key: 'stocklog', localKey: 'ag_stocklog', default: [] },
-        { key: 'settings', localKey: 'ag_settings', default: SEED_SETTINGS }
-      ];
-
-      for (const col of collections) {
-        try {
-          const d = await getDoc(doc(db, 'store', col.key));
-          if (!d.exists()) {
-            const local = localStorage.getItem(col.localKey);
-            let val = col.default;
-            if (local && local !== 'undefined') {
-              try { val = JSON.parse(local); } catch(e) {}
-            }
-            await setDoc(doc(db, 'store', col.key), { value: cleanData(val) });
+    // Multi-tab real-time sync via BroadcastChannel
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const channel = new BroadcastChannel('aquagel_sync');
+        syncChannelRef.current = channel;
+        channel.onmessage = (event) => {
+          if (!event.data || !event.data.type) return;
+          switch (event.data.type) {
+            case 'customers': _setCustomers(event.data.data); break;
+            case 'orders': _setOrders(event.data.data); break;
+            case 'inventory': _setInventory(event.data.data); break;
+            case 'personnel': _setPersonnel(event.data.data); break;
+            case 'stocklog': _setStockLog(event.data.data); break;
+            case 'settings': _setSettings(event.data.data); break;
           }
-        } catch (err) {
-          console.error("Migration error for", col.key, err);
-        }
+        };
+      } catch (e) {
+        console.warn("BroadcastChannel error:", e);
       }
-    };
-    
-    migrateToFirebase();
+    }
 
+    // Storage event sync fallback
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.newValue) return;
+      try {
+        const val = JSON.parse(e.newValue);
+        if (e.key === 'ag_customers') _setCustomers(val);
+        else if (e.key === 'ag_orders') _setOrders(val);
+        else if (e.key === 'ag_inventory') _setInventory(val);
+        else if (e.key === 'ag_personnel') _setPersonnel(val);
+        else if (e.key === 'ag_stocklog') _setStockLog(val);
+        else if (e.key === 'ag_settings') _setSettings(val);
+      } catch (err) {}
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // Firestore real-time snapshots
     const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), 
       (d) => { if (d.exists() && d.data().value) { _setCustomers(d.data().value); localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); } },
-      (err) => console.error("Firestore onSnapshot error (customers):", err)
+      (err) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
     );
     const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), 
       (d) => { if (d.exists() && d.data().value) { _setOrders(d.data().value); localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); } },
-      (err) => console.error("Firestore onSnapshot error (orders):", err)
+      (err) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
     );
     const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), 
       (d) => { if (d.exists() && d.data().value) { _setInventory(d.data().value); localStorage.setItem('ag_inventory', JSON.stringify(d.data().value)); } },
-      (err) => console.error("Firestore onSnapshot error (inventory):", err)
+      (err) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
     );
     const unsubPersonnel = onSnapshot(doc(db, 'store', 'personnel'), 
       (d) => { if (d.exists() && d.data().value) { _setPersonnel(d.data().value); localStorage.setItem('ag_personnel', JSON.stringify(d.data().value)); } },
-      (err) => console.error("Firestore onSnapshot error (personnel):", err)
+      (err) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
     );
     const unsubStockLog = onSnapshot(doc(db, 'store', 'stocklog'), 
       (d) => { if (d.exists() && d.data().value) { _setStockLog(d.data().value); localStorage.setItem('ag_stocklog', JSON.stringify(d.data().value)); } },
-      (err) => console.error("Firestore onSnapshot error (stocklog):", err)
+      (err) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
     );
     const unsubSettings = onSnapshot(doc(db, 'store', 'settings'), 
       (d) => { if (d.exists() && d.data().value) { _setSettings(d.data().value); localStorage.setItem('ag_settings', JSON.stringify(d.data().value)); } },
-      (err) => console.error("Firestore onSnapshot error (settings):", err)
+      (err) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
     );
 
     return () => {
       unsubCustomers(); unsubOrders(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
+      window.removeEventListener('storage', handleStorage);
+      syncChannelRef.current?.close();
     };
   }, []);
 
   const cleanData = (data: any) => JSON.parse(JSON.stringify(data));
   const setSession = (s: User | null) => { _setSession(s); localStorage.setItem('ag_session', JSON.stringify(s)); };
   
+  const broadcastAndSave = (key: string, data: any) => {
+    try {
+      localStorage.setItem('ag_' + key, JSON.stringify(data));
+      syncChannelRef.current?.postMessage({ type: key, data });
+    } catch (e) {}
+  };
+
+  const isQuotaExhaustedRef = useRef<boolean>(false);
+  useEffect(() => {
+    isQuotaExhaustedRef.current = quotaWarning;
+  }, [quotaWarning]);
+
   const safeSetDoc = (docRef: any, data: any) => {
+    if (isQuotaExhaustedRef.current) return;
     setDoc(docRef, data).catch(err => {
-      console.error("Firestore Write Failed:", err);
-      if (err.code === 'resource-exhausted') {
-        alert("CRITICAL ERROR: Firebase daily quota limit exceeded. Sync is paused until the limit resets.");
+      if (err?.code === 'resource-exhausted') {
+        isQuotaExhaustedRef.current = true;
+        setQuotaWarning(true);
       }
     });
   };
 
-  const setCustomers = (c: Customer[]) => { _setCustomers(c); safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c) }); };
-  const setOrders = (o: Order[]) => { _setOrders(o); safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o) }); };
-  const setInventory = (i: Inventory) => { _setInventory(i); safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(i) }); };
-  const setPersonnel = (p: string[]) => { _setPersonnel(p); safeSetDoc(doc(db, 'store', 'personnel'), { value: cleanData(p) }); };
-  const setStockLog = (l: { msg: string; time: number }[]) => { _setStockLog(l); safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(l) }); };
-  const setSettings = (s: Settings) => { _setSettings(s); safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(s) }); };
+  const setCustomers = (c: Customer[]) => { 
+    _setCustomers(c); 
+    broadcastAndSave('customers', c);
+    safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c) }); 
+  };
+  const setOrders = (o: Order[]) => { 
+    _setOrders(o); 
+    broadcastAndSave('orders', o);
+    safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o) }); 
+  };
+  const setInventory = (i: Inventory) => { 
+    _setInventory(i); 
+    broadcastAndSave('inventory', i);
+    safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(i) }); 
+  };
+  const setPersonnel = (p: string[]) => { 
+    _setPersonnel(p); 
+    broadcastAndSave('personnel', p);
+    safeSetDoc(doc(db, 'store', 'personnel'), { value: cleanData(p) }); 
+  };
+  const setStockLog = (l: { msg: string; time: number }[]) => { 
+    _setStockLog(l); 
+    broadcastAndSave('stocklog', l);
+    safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(l) }); 
+  };
+  const setSettings = (s: Settings) => { 
+    _setSettings(s); 
+    broadcastAndSave('settings', s);
+    safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(s) }); 
+  };
 
   const updateCustomerBalance = (customerId: string, amountChange: number) => {
     const newCustomers = customers.map(c => 
@@ -228,6 +264,7 @@ function getInitialState<T>(key: string, defaultValue: T): T {
       stockLog, setStockLog,
       settings, setSettings,
       updateCustomerBalance,
+      quotaWarning,
     }}>
       {children}
     </StoreContext.Provider>
@@ -239,3 +276,4 @@ export function useStore() {
   if (!context) throw new Error('useStore must be used within StoreProvider');
   return context;
 }
+
