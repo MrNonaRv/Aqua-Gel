@@ -177,7 +177,7 @@ export default function Customers() {
 
                   <div className="pt-4 border-t border-brand-border">
                     <label className="block text-sm font-medium mb-2">Record Payment</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-4">
                       <input 
                         type="number" 
                         className="form-control flex-1" 
@@ -188,6 +188,20 @@ export default function Customers() {
                       />
                       <button className="btn btn-primary whitespace-nowrap" onClick={handleRecordPayment}>Apply Payment</button>
                     </div>
+
+                    <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-brand-border text-brand-blue focus:ring-brand-blue" 
+                        checked={viewCust.isLoyal}
+                        onChange={e => {
+                          const updated = { ...viewCust, isLoyal: e.target.checked };
+                          setCustomers(customers.map(c => c.id === viewCust.id ? updated : c));
+                          setViewCust(updated);
+                        }}
+                      />
+                      Tag as Loyal / Regular Customer (2% Discount)
+                    </label>
                   </div>
                 </>
               );

@@ -23,6 +23,7 @@ export interface Customer extends User {
   unpaid: number;
   totalGallons: number;
   isLoyal: boolean;
+  profilePictureUrl?: string;
 }
 
 export interface Order {
@@ -45,6 +46,19 @@ export interface Order {
   paidDate?: number;
 }
 
+export interface Subscription {
+  id: string;
+  customerId: string;
+  customerName: string;
+  type: 'slim' | 'round';
+  qty: number;
+  intervalDays: number;
+  nextDeliveryDate: number;
+  address: string;
+  deliveryNotes?: string;
+  active: boolean;
+}
+
 export interface Inventory {
   slim: number;
   round: number;
@@ -65,6 +79,8 @@ interface StoreContextType {
   setCustomers: (customers: Customer[]) => void;
   orders: Order[];
   setOrders: (orders: Order[]) => void;
+  subscriptions: Subscription[];
+  setSubscriptions: (subs: Subscription[]) => void;
   inventory: Inventory;
   setInventory: (inventory: Inventory) => void;
   personnel: string[];
@@ -101,6 +117,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [session, _setSession] = useState<User | null>(() => getInitialState('ag_session', null));
   const [customers, _setCustomers] = useState<Customer[]>(() => getInitialState('ag_customers', SEED_CUSTOMERS));
   const [orders, _setOrders] = useState<Order[]>(() => getInitialState('ag_orders', SEED_ORDERS));
+  const [subscriptions, _setSubscriptions] = useState<Subscription[]>(() => getInitialState('ag_subscriptions', []));
   const [inventory, _setInventory] = useState<Inventory>(() => getInitialState('ag_inventory', SEED_INVENTORY));
   const [personnel, _setPersonnel] = useState<string[]>(() => getInitialState('ag_personnel', SEED_PERSONNEL));
   const [stockLog, _setStockLog] = useState<{ msg: string; time: number }[]>(() => getInitialState('ag_stocklog', SEED_STOCKLOG));
@@ -119,6 +136,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           switch (event.data.type) {
             case 'customers': _setCustomers(event.data.data); break;
             case 'orders': _setOrders(event.data.data); break;
+            case 'subscriptions': _setSubscriptions(event.data.data); break;
             case 'inventory': _setInventory(event.data.data); break;
             case 'personnel': _setPersonnel(event.data.data); break;
             case 'stocklog': _setStockLog(event.data.data); break;
@@ -137,6 +155,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const val = JSON.parse(e.newValue);
         if (e.key === 'ag_customers') _setCustomers(val);
         else if (e.key === 'ag_orders') _setOrders(val);
+        else if (e.key === 'ag_subscriptions') _setSubscriptions(val);
         else if (e.key === 'ag_inventory') _setInventory(val);
         else if (e.key === 'ag_personnel') _setPersonnel(val);
         else if (e.key === 'ag_stocklog') _setStockLog(val);
@@ -152,6 +171,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     );
     const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), 
       (d) => { if (d.exists() && d.data().value) { _setOrders(d.data().value); localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); } },
+      (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
+    );
+    const unsubSubscriptions = onSnapshot(doc(db, 'store', 'subscriptions'), 
+      (d) => { if (d.exists() && d.data().value) { _setSubscriptions(d.data().value); localStorage.setItem('ag_subscriptions', JSON.stringify(d.data().value)); } },
       (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
     );
     const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), 
@@ -172,7 +195,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
-      unsubCustomers(); unsubOrders(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
+      unsubCustomers(); unsubOrders(); unsubSubscriptions(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
       window.removeEventListener('storage', handleStorage);
       syncChannelRef.current?.close();
     };
@@ -212,6 +235,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     _setOrders(o); 
     broadcastAndSave('orders', o);
     safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o) }); 
+  };
+  const setSubscriptions = (subs: Subscription[]) => {
+    _setSubscriptions(subs);
+    broadcastAndSave('subscriptions', subs);
+    safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData(subs) });
   };
   const setInventory = (i: Inventory) => { 
     _setInventory(i); 
@@ -259,6 +287,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       session, setSession,
       customers: customersWithLoyalty, setCustomers,
       orders, setOrders,
+      subscriptions, setSubscriptions,
       inventory, setInventory,
       personnel, setPersonnel,
       stockLog, setStockLog,

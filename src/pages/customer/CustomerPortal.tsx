@@ -5,10 +5,23 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, Package, User, Power, MapPin, Phone, Menu, X, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SlimGallonIcon, RoundGallonIcon } from '../../components/icons/Gallons';
+import { toast } from 'sonner';
 
 export default function CustomerPortal() {
   useCustomerNotifications();
-  const { session, setSession, inventory, setInventory, orders, setOrders, customers, setCustomers, settings } = useStore();
+  const { session, setSession, inventory, setInventory, orders, setOrders, customers, setCustomers, settings, subscriptions, setSubscriptions } = useStore();
+  
+  useEffect(() => {
+    // Notify customer about upcoming deliveries
+    const myActiveSubs = subscriptions.filter(s => s.customerId === session?.id && s.active);
+    const dueSubs = myActiveSubs.filter(s => s.nextDeliveryDate <= Date.now() + (24 * 60 * 60 * 1000)); // Due within 24 hours
+    if (dueSubs.length > 0) {
+      toast.info('Upcoming Delivery Reminder', {
+        description: `You have ${dueSubs.length} recurring delivery scheduled for today/tomorrow.`,
+        duration: 10000,
+      });
+    }
+  }, [subscriptions.length, session?.id]);
   const navigate = useNavigate();
   const [tab, setTab] = useState<'order' | 'myorders' | 'payments' | 'profile'>('order');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -22,7 +35,38 @@ export default function CustomerPortal() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash'>('cash');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [address, setAddress] = useState(customer?.address || '');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [isSubscription, setIsSubscription] = useState(false);
+  const [intervalDays, setIntervalDays] = useState(7);
   const [orderSuccess, setOrderSuccess] = useState('');
+
+  // Profile Edit State
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editProfilePicUrl, setEditProfilePicUrl] = useState('');
+
+  const handleEditProfileStart = () => {
+    if (customer) {
+      setEditPhone(customer.phone || '');
+      setEditAddress(customer.address || '');
+      setEditProfilePicUrl(customer.profilePictureUrl || '');
+      setIsEditingProfile(true);
+    }
+  };
+
+  const handleEditProfileSave = () => {
+    if (customer) {
+      setCustomers(customers.map(c => c.id === customer.id ? {
+        ...c,
+        phone: editPhone,
+        address: editAddress,
+        profilePictureUrl: editProfilePicUrl
+      } : c));
+      setIsEditingProfile(false);
+      setAddress(editAddress); // Update default checkout address
+    }
+  };
 
   const handleLogout = () => {
     setSession(null);
@@ -34,7 +78,9 @@ export default function CustomerPortal() {
   };
 
   const unitPrice = selectedType === 'slim' ? inventory.priceSlim : inventory.priceRound;
-  const total = unitPrice * qty;
+  const rawTotal = unitPrice * qty;
+  const discount = customer?.isLoyal ? rawTotal * 0.02 : 0;
+  const total = rawTotal - discount;
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentProcessed, setPaymentProcessed] = useState(false);
@@ -216,7 +262,8 @@ export default function CustomerPortal() {
       date: Date.now(),
       personnel: null,
       address: method === 'delivery' ? address : null,
-      containerReturn: false
+      containerReturn: false,
+      deliveryNotes: deliveryNotes.trim() || undefined
     };
 
     setOrders([newOrder, ...orders]);
@@ -227,9 +274,27 @@ export default function CustomerPortal() {
       setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: c.unpaid + total } : c));
     }
 
-    setOrderSuccess(`✅ Order placed successfully! Total: ₱${total}. Status: Pending.`);
+    if (isSubscription && method === 'delivery') {
+      const newSub = {
+        id: 'sub' + Date.now(),
+        customerId: session!.id,
+        customerName: session!.name,
+        type: selectedType,
+        qty,
+        intervalDays,
+        nextDeliveryDate: Date.now() + (intervalDays * 24 * 60 * 60 * 1000),
+        address: address,
+        deliveryNotes: deliveryNotes.trim() || undefined,
+        active: true
+      };
+      setSubscriptions([newSub, ...subscriptions]);
+    }
+
+    setOrderSuccess(isSubscription ? `✅ Order and Subscription placed! Deliveries scheduled every ${intervalDays} days.` : `✅ Order placed successfully! Total: ₱${total}. Status: Pending.`);
     setQty(1);
     setReferenceNumber('');
+    setDeliveryNotes('');
+    setIsSubscription(false);
     setTimeout(() => setOrderSuccess(''), 5000);
   };
 
@@ -495,11 +560,48 @@ export default function CustomerPortal() {
                           <label className="block text-sm font-semibold mb-2 text-brand-dark">Delivery Address</label>
                           <input 
                             type="text" 
-                            className="form-control text-sm sm:text-base py-3"
+                            className="form-control text-sm sm:text-base py-3 mb-4"
                             value={address}
                             onChange={e => setAddress(e.target.value)}
                             placeholder="Enter your full delivery address"
                           />
+                          <label className="block text-sm font-semibold mb-2 text-brand-dark">Delivery Instructions (Optional)</label>
+                          <textarea 
+                            className="form-control text-sm sm:text-base py-3 mb-4"
+                            value={deliveryNotes}
+                            onChange={e => setDeliveryNotes(e.target.value)}
+                            placeholder="Specific instructions for delivery personnel..."
+                            rows={2}
+                          />
+                          <div className="bg-brand-gray-light p-4 rounded-xl border border-brand-border">
+                            <label className="flex items-start gap-3 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                className="mt-1 rounded border-brand-border text-brand-blue focus:ring-brand-blue" 
+                                checked={isSubscription}
+                                onChange={e => setIsSubscription(e.target.checked)}
+                              />
+                              <div>
+                                <span className="block font-bold text-brand-dark">Schedule Recurring Delivery</span>
+                                <span className="text-xs text-brand-gray">Automatically schedule this order for the future.</span>
+                              </div>
+                            </label>
+                            {isSubscription && (
+                              <div className="mt-3 pt-3 border-t border-brand-border flex items-center gap-3">
+                                <span className="text-sm font-medium text-brand-gray">Deliver every</span>
+                                <select 
+                                  className="form-control text-sm py-1.5 w-32"
+                                  value={intervalDays}
+                                  onChange={e => setIntervalDays(Number(e.target.value))}
+                                >
+                                  <option value={7}>1 Week</option>
+                                  <option value={14}>2 Weeks</option>
+                                  <option value={21}>3 Weeks</option>
+                                  <option value={30}>1 Month</option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     )}
@@ -603,6 +705,42 @@ export default function CustomerPortal() {
               <p className="text-brand-gray text-lg">Track your current and past orders</p>
             </div>
 
+            {subscriptions.filter(s => s.customerId === session?.id && s.active).length > 0 && (
+              <div className="mb-8">
+                <h2 className="font-heading text-xl font-bold mb-4 text-brand-dark">Active Subscriptions</h2>
+                <div className="grid gap-4">
+                  {subscriptions.filter(s => s.customerId === session?.id && s.active).map(sub => (
+                    <div key={sub.id} className="bg-[#e8f3ff] rounded-2xl border border-brand-blue/30 p-4 sm:p-6 shadow-sm">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-heading font-black text-lg text-brand-blue mb-1">
+                            {sub.type === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {sub.qty}
+                          </div>
+                          <div className="text-sm font-semibold text-brand-dark">
+                            Deliver Every {sub.intervalDays} Days
+                          </div>
+                          <div className="text-xs text-brand-gray mt-1">
+                            Next delivery: {new Date(sub.nextDeliveryDate).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm('Cancel this recurring subscription?')) {
+                              setSubscriptions(subscriptions.map(s => s.id === sub.id ? { ...s, active: false } : s));
+                            }
+                          }}
+                          className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <h2 className="font-heading text-xl font-bold mb-4 text-brand-dark">Order History</h2>
             <motion.div 
               initial="hidden"
               animate="show"
@@ -647,18 +785,31 @@ export default function CustomerPortal() {
                         {o.status === 'Pending' && !o.paid && o.checkoutUrl && o.paymentMethod === 'gcash' && (
                           <button 
                             onClick={() => window.open(o.checkoutUrl, '_blank')}
-                            className="text-xs font-bold text-white hover:text-white bg-[#0a6ed1] hover:bg-[#085ab3] px-3 py-1.5 rounded-full sm:mt-1 transition-colors"
+                            className="text-xs font-bold text-white hover:text-white bg-[#0a6ed1] hover:bg-[#085ab3] px-3 py-1.5 rounded-full mt-2 transition-colors block w-full sm:w-auto"
                           >
                             Complete Payment
                           </button>
                         )}
                         {o.status === 'Pending' && (
-                          <button 
-                            onClick={() => handleCancelOrder(o.id)} 
-                            className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full sm:mt-1 transition-colors"
-                          >
-                            Cancel Order
-                          </button>
+                          <div className="flex flex-col sm:flex-row gap-2 mt-2 sm:mt-1">
+                            <button 
+                              onClick={() => {
+                                const newAddress = window.prompt('Enter new delivery address:', o.address || '');
+                                if (newAddress !== null && newAddress.trim() !== '') {
+                                  setOrders(orders.map(order => order.id === o.id ? { ...order, address: newAddress.trim() } : order));
+                                }
+                              }}
+                              className="text-xs font-bold text-brand-blue hover:text-brand-dark bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors flex-1"
+                            >
+                              Edit Address
+                            </button>
+                            <button 
+                              onClick={() => handleCancelOrder(o.id)} 
+                              className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-colors flex-1"
+                            >
+                              Cancel Order
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -862,33 +1013,60 @@ export default function CustomerPortal() {
             transition={{ duration: 0.4 }}
             className="max-w-xl"
           >
-            <div className="mb-8">
-              <h1 className="font-heading text-3xl font-bold mb-2">My Profile</h1>
-              <p className="text-brand-gray text-lg">Your account details and balance</p>
+            <div className="mb-8 flex justify-between items-center">
+              <div>
+                <h1 className="font-heading text-3xl font-bold mb-2">My Profile</h1>
+                <p className="text-brand-gray text-lg">Your account details and balance</p>
+              </div>
+              {!isEditingProfile && (
+                <button 
+                  onClick={handleEditProfileStart}
+                  className="bg-white border border-brand-border text-brand-dark px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 transition-colors"
+                >
+                  Edit Profile
+                </button>
+              )}
             </div>
 
             <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 shadow-sm">
               <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6 mb-8 pb-8 border-b border-brand-border">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#00a896] to-[#0a6ed1] rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg shrink-0">
-                  {customer.name[0]}
-                </div>
-                <div>
-                  <h2 className="font-heading font-bold text-2xl text-brand-dark mb-1 flex items-center gap-2">
+                {customer.profilePictureUrl ? (
+                  <img src={customer.profilePictureUrl} alt="Profile" className="w-20 h-20 rounded-2xl shadow-lg shrink-0 object-cover" />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-[#00a896] to-[#0a6ed1] rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg shrink-0">
+                    {customer.name[0]}
+                  </div>
+                )}
+                <div className="flex-1">
+                  <h2 className="font-heading font-bold text-2xl text-brand-dark mb-1 flex items-center justify-center sm:justify-start gap-2">
                     {customer.name}
                     {customer.isLoyal && <span title="Loyal / Regular Customer" className="text-yellow-400 drop-shadow-sm text-xl lg:text-2xl">⭐</span>}
                   </h2>
                   <div className="text-brand-gray font-medium mb-3">@{customer.username}</div>
-                  {customer.isLoyal ? (
-                    <span className="badge py-1 px-3 bg-gradient-to-r from-yellow-100 to-amber-50 text-yellow-800 border border-yellow-300 shadow-sm flex items-center gap-1.5 w-fit">
-                      ⭐ <span className="font-bold">Loyal / Regular Customer</span>
-                    </span>
-                  ) : (
-                    <div className="text-xs text-brand-gray font-medium max-w-[200px]">
-                      {customer.totalGallons} / 50 gallons for Loyal Status
-                      <div className="w-full h-2 bg-[#f0f3f8] rounded-full mt-1.5 overflow-hidden shadow-inner">
-                        <div className="h-full bg-gradient-to-r from-brand-blue to-brand-teal transition-all duration-1000" style={{ width: `${Math.min(100, (customer.totalGallons / 50) * 100)}%` }} />
-                      </div>
+                  {isEditingProfile ? (
+                    <div className="mt-4">
+                      <label className="block text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2 text-left">Profile Picture URL (Optional)</label>
+                      <input 
+                        type="text" 
+                        className="form-control text-sm py-2 mb-4 w-full"
+                        value={editProfilePicUrl}
+                        onChange={e => setEditProfilePicUrl(e.target.value)}
+                        placeholder="https://example.com/photo.jpg"
+                      />
                     </div>
+                  ) : (
+                    customer.isLoyal ? (
+                      <span className="badge py-1 px-3 bg-gradient-to-r from-yellow-100 to-amber-50 text-yellow-800 border border-yellow-300 shadow-sm flex items-center gap-1.5 w-fit mx-auto sm:mx-0">
+                        ⭐ <span className="font-bold">Loyal / Regular Customer</span>
+                      </span>
+                    ) : (
+                      <div className="text-xs text-brand-gray font-medium max-w-[200px] mx-auto sm:mx-0">
+                        {customer.totalGallons} / 50 gallons for Loyal Status
+                        <div className="w-full h-2 bg-[#f0f3f8] rounded-full mt-1.5 overflow-hidden shadow-inner">
+                          <div className="h-full bg-gradient-to-r from-brand-blue to-brand-teal transition-all duration-1000" style={{ width: `${Math.min(100, (customer.totalGallons / 50) * 100)}%` }} />
+                        </div>
+                      </div>
+                    )
                   )}
                 </div>
               </div>
@@ -896,19 +1074,46 @@ export default function CustomerPortal() {
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex gap-4 p-4 rounded-2xl bg-[#f4f7fb]">
                   <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-brand-gray shrink-0 shadow-sm"><Phone size={18} /></div>
-                  <div>
+                  <div className="flex-1">
                     <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Phone Number</div>
-                    <div className="font-medium text-brand-dark text-base">{customer.phone || 'Not provided'}</div>
+                    {isEditingProfile ? (
+                      <input 
+                        type="text" 
+                        className="form-control text-sm py-2 w-full"
+                        value={editPhone}
+                        onChange={e => setEditPhone(e.target.value)}
+                        placeholder="e.g. 09123456789"
+                      />
+                    ) : (
+                      <div className="font-medium text-brand-dark text-base">{customer.phone || 'Not provided'}</div>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex gap-4 p-4 rounded-2xl bg-[#f4f7fb]">
                   <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-brand-gray shrink-0 shadow-sm"><MapPin size={18} /></div>
-                  <div>
+                  <div className="flex-1">
                     <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Delivery Address</div>
-                    <div className="font-medium text-brand-dark text-base">{customer.address}</div>
+                    {isEditingProfile ? (
+                      <textarea 
+                        className="form-control text-sm py-2 w-full"
+                        value={editAddress}
+                        onChange={e => setEditAddress(e.target.value)}
+                        placeholder="Enter your full address"
+                        rows={2}
+                      />
+                    ) : (
+                      <div className="font-medium text-brand-dark text-base">{customer.address || 'Not provided'}</div>
+                    )}
                   </div>
                 </div>
+
+                {isEditingProfile && (
+                  <div className="flex gap-3 pt-4">
+                    <button onClick={handleEditProfileSave} className="btn btn-primary flex-1">Save Profile</button>
+                    <button onClick={() => setIsEditingProfile(false)} className="btn btn-secondary flex-1">Cancel</button>
+                  </div>
+                )}
 
                 <div className={`flex gap-4 p-5 rounded-2xl ${customer.unpaid > 0 ? 'bg-[#fff0f0] border border-[#ffcdd2]' : 'bg-[#e8f5e9] border border-[#a5d6a7]'}`}>
                   <div className={`w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm ${customer.unpaid > 0 ? 'text-[#e53935]' : 'text-[#2e7d32]'}`}>

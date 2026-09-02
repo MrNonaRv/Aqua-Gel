@@ -1,9 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore, Order, Customer } from '../../lib/store';
 import { notifyStatusChange } from '../../lib/notifications';
+import { toast } from 'sonner';
 
 export default function Orders() {
-  const { orders, setOrders, personnel, updateCustomerBalance, customers, setCustomers, inventory, setInventory } = useStore();
+  const { orders, setOrders, personnel, updateCustomerBalance, customers, setCustomers, inventory, setInventory, subscriptions, setSubscriptions } = useStore();
+  const [view, setView] = useState<'orders' | 'subscriptions'>('orders');
+
+  useEffect(() => {
+    // Notify admin about due subscriptions
+    const dueSubscriptions = subscriptions.filter(s => s.active && s.nextDeliveryDate <= Date.now());
+    if (dueSubscriptions.length > 0) {
+      toast.warning('Subscriptions Due', {
+        description: `There are ${dueSubscriptions.length} recurring subscriptions due for delivery today. Please trigger them.`,
+        duration: 10000,
+      });
+    }
+  }, [subscriptions.length]);
   const [statusF, setStatusF] = useState('');
   const [paidF, setPaidF] = useState('');
   const [methodF, setMethodF] = useState('');
@@ -202,16 +215,37 @@ export default function Orders() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="font-heading text-3xl font-bold mb-1">Orders</h1>
-          <p className="text-brand-gray">Manage all customer orders and refill transactions</p>
+          <p className="text-brand-gray">Manage customer orders and recurring subscriptions</p>
         </div>
         <button
           onClick={handleOpenWalkIn}
           className="btn btn-primary bg-brand-blue border-brand-blue text-white px-5 py-2.5 rounded-full hover:bg-brand-blue-dark flex items-center gap-1.5 font-bold shadow-md hover:shadow-lg transition-all"
         >
-          Add <span className="text-lg">⊕</span>
+          Add Walk-in <span className="text-lg">⊕</span>
         </button>
       </div>
 
+      <div className="flex items-center gap-2 mb-6 bg-white p-2 border border-brand-border rounded-xl w-fit">
+        <button 
+          onClick={() => setView('orders')}
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${view === 'orders' ? 'bg-brand-blue text-white shadow-sm' : 'text-brand-gray hover:bg-brand-gray-light'}`}
+        >
+          Orders
+        </button>
+        <button 
+          onClick={() => setView('subscriptions')}
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${view === 'subscriptions' ? 'bg-brand-blue text-white shadow-sm' : 'text-brand-gray hover:bg-brand-gray-light'}`}
+        >
+          Subscriptions
+          {subscriptions.filter(s => s.active).length > 0 && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${view === 'subscriptions' ? 'bg-white text-brand-blue' : 'bg-brand-blue text-white'}`}>
+              {subscriptions.filter(s => s.active).length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {view === 'orders' && (
       <div className="card">
         <div className="flex flex-wrap gap-3 mb-6">
           <select className="form-control w-auto py-2 px-3 text-sm" value={statusF} onChange={e => setStatusF(e.target.value)}>
@@ -261,7 +295,15 @@ export default function Orders() {
                   <td className="text-xs text-brand-gray">
                     {new Date(o.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </td>
-                  <td className="font-bold">{o.customerName}</td>
+                  <td className="font-bold">
+                    {o.customerName}
+                    {o.method === 'delivery' && o.address && (
+                      <div className="text-[10px] font-normal text-brand-gray mt-1 truncate max-w-[150px]" title={o.address}>📍 {o.address}</div>
+                    )}
+                    {o.deliveryNotes && (
+                      <div className="text-[10px] font-normal text-brand-blue bg-blue-50 px-1 py-0.5 rounded mt-1 truncate max-w-[150px]" title={o.deliveryNotes}>📝 {o.deliveryNotes}</div>
+                    )}
+                  </td>
                   <td>{o.type === 'slim' ? '🔵 Slim' : '🟢 Round'}</td>
                   <td>{o.qty}</td>
                   <td>{o.method === 'delivery' ? '🚚 Delivery' : '🏪 Pick-up'}</td>
@@ -307,6 +349,121 @@ export default function Orders() {
           </table>
         </div>
       </div>
+      )}
+
+      {view === 'subscriptions' && (
+        <div className="card">
+          <div className="flex flex-wrap gap-3 mb-6 items-center">
+            <h2 className="font-heading text-xl font-bold text-brand-dark">Recurring Subscriptions</h2>
+            <div className="text-sm text-brand-gray ml-auto">Manage automated scheduled deliveries</div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="table-container">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Product</th>
+                  <th>Interval</th>
+                  <th>Next Delivery</th>
+                  <th>Address</th>
+                  <th className="text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subscriptions.map(sub => (
+                  <tr key={sub.id} className={!sub.active ? "opacity-50" : ""}>
+                    <td className="font-bold text-brand-dark">{sub.customerName}</td>
+                    <td>
+                      <span className="font-semibold text-brand-dark">{sub.qty}x</span>{' '}
+                      <span className="text-xs text-brand-gray uppercase tracking-wider font-bold">{sub.type}</span>
+                    </td>
+                    <td><span className="badge badge-paid">Every {sub.intervalDays} days</span></td>
+                    <td className="text-sm font-semibold">
+                      {sub.active ? (
+                        new Date(sub.nextDeliveryDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+                      ) : (
+                        <span className="text-brand-gray">Cancelled</span>
+                      )}
+                    </td>
+                    <td className="text-xs text-brand-gray max-w-[200px] truncate">{sub.address}</td>
+                    <td className="text-right">
+                      {sub.active && (
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`Create a pending order for ${sub.customerName} and update the next delivery date?`)) {
+                              const newOrder: Order = {
+                                id: 'o' + Date.now(),
+                                customerId: sub.customerId,
+                                customerName: sub.customerName,
+                                type: sub.type,
+                                qty: sub.qty,
+                                method: 'delivery',
+                                paymentMethod: 'cash', // Defaulting to cash for recurring deliveries
+                                status: 'Pending',
+                                total: sub.qty * (sub.type === 'slim' ? inventory.priceSlim : inventory.priceRound),
+                                paid: false,
+                                date: Date.now(),
+                                personnel: null,
+                                address: sub.address,
+                                containerReturn: false,
+                                deliveryNotes: sub.deliveryNotes
+                              };
+                              setOrders([newOrder, ...orders]);
+                              setInventory({ ...inventory, [sub.type]: inventory[sub.type] - sub.qty });
+                              
+                              const customer = customers.find(c => c.id === sub.customerId);
+                              if (customer) {
+                                updateCustomerBalance(sub.customerId, newOrder.total);
+                              }
+
+                              setSubscriptions(subscriptions.map(s => 
+                                s.id === sub.id ? { ...s, nextDeliveryDate: s.nextDeliveryDate + (s.intervalDays * 24 * 60 * 60 * 1000) } : s
+                              ));
+                              alert('Order created successfully!');
+                            }
+                          }}
+                          className="text-xs font-bold bg-[#0a6ed1] hover:bg-[#085ab3] text-white px-3 py-1.5 rounded-full transition-colors mr-2"
+                        >
+                          Trigger Order
+                        </button>
+                      )}
+                      {sub.active ? (
+                        <button 
+                          onClick={() => {
+                            if (window.confirm('Cancel this subscription?')) {
+                              setSubscriptions(subscriptions.map(s => s.id === sub.id ? { ...s, active: false } : s));
+                            }
+                          }}
+                          className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            setSubscriptions(subscriptions.map(s => s.id === sub.id ? { ...s, active: true, nextDeliveryDate: Date.now() + (s.intervalDays * 24 * 60 * 60 * 1000) } : s));
+                          }}
+                          className="text-xs font-bold text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-full transition-colors"
+                        >
+                          Reactivate
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {subscriptions.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-12 text-brand-gray">
+                      No subscriptions found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Walk in Order Modal */}
       {showAddWalkIn && (
@@ -487,6 +644,12 @@ export default function Orders() {
             <div className="space-y-4">
               {editOrder.method === 'delivery' && (
                 <>
+                  {editOrder.deliveryNotes && (
+                    <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm mb-4">
+                      <strong className="block mb-1">Delivery Notes:</strong>
+                      {editOrder.deliveryNotes}
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Order Status</label>
                     <div className="relative">

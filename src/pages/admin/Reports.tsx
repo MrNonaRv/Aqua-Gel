@@ -114,56 +114,89 @@ export default function Reports() {
   const slimSold = paid.filter(o => o.type === 'slim').reduce((s, o) => s + o.qty, 0);
   const roundSold = paid.filter(o => o.type === 'round').reduce((s, o) => s + o.qty, 0);
   
+  // Calculate active customers for this period (customers who placed at least one order)
+  const activeCustomersCount = new Set(finalOrders.map(o => o.customerId)).size;
+
   const periodLabels = { daily: 'Today', weekly: 'Last 7 Days', monthly: 'This Month', yearly: 'This Year' };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="font-heading text-3xl font-bold mb-1">Income Reports</h1>
-        <p className="text-brand-gray">Track sales performance across different time periods. Click on a bar in the chart to filter metrics for that specific period.</p>
+    <div className="max-w-6xl mx-auto print:max-w-full print:m-0 print:p-4">
+      <div className="mb-6 flex justify-between items-end print:hidden">
+        <div>
+          <h1 className="font-heading text-3xl font-bold mb-1">Income Reports</h1>
+          <p className="text-brand-gray">Track sales performance across different time periods. Click on a bar in the chart to filter metrics for that specific period.</p>
+        </div>
+        <button 
+          onClick={() => window.print()}
+          className="btn btn-secondary border-brand-border bg-white shadow-sm flex items-center gap-2 font-bold"
+        >
+          🖨️ Export PDF
+        </button>
+      </div>
+
+      <div className="hidden print:block mb-6">
+        <h1 className="font-heading text-3xl font-bold mb-1">Aqua Gel - Comprehensive Report</h1>
+        <p className="text-brand-gray text-sm">Report Period: {subFilter ? subFilter.name : periodLabels[period]} ({new Date().toLocaleString('en-PH')})</p>
       </div>
 
       {(period === 'daily' || period === 'weekly' || subFilter) && (
-        <div className="bg-gradient-to-r from-brand-blue to-brand-teal text-white p-6 rounded-2xl mb-8 shadow-md">
-          <div className="text-white/80 font-medium mb-1 uppercase tracking-wider text-sm">Total Income {subFilter ? subFilter.name : periodLabels[period]}</div>
+        <div className="bg-gradient-to-r from-brand-blue to-brand-teal text-white p-6 rounded-2xl mb-8 shadow-md print:bg-none print:bg-white print:border print:border-brand-border print:text-brand-dark">
+          <div className="text-white/80 print:text-brand-gray font-medium mb-1 uppercase tracking-wider text-sm">Total Income {subFilter ? subFilter.name : periodLabels[period]}</div>
           <div className="font-heading text-4xl font-bold">₱{income.toLocaleString()}</div>
         </div>
       )}
 
-      <div className="flex gap-2 mb-8 bg-brand-gray-light p-1 rounded-xl w-fit border border-brand-border">
+      <div className="flex gap-2 mb-8 bg-brand-gray-light p-1 rounded-xl w-fit border border-brand-border print:hidden">
         {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
           <button 
             key={p}
             className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${period === p ? 'bg-white text-brand-blue shadow-sm' : 'text-brand-gray hover:text-brand-dark'}`}
-            onClick={() => setPeriod(p)}
+            onClick={() => { setPeriod(p); setSubFilter(null); }}
           >
             {p}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="card !mb-0 p-6">
+      {subFilter && (
+        <div className="mb-4 flex items-center gap-3 print:hidden">
+          <span className="text-sm text-brand-gray font-medium">Filtering by: <strong className="text-brand-blue">{subFilter.name}</strong></span>
+          <button 
+            onClick={() => setSubFilter(null)}
+            className="text-xs bg-brand-gray-light hover:bg-brand-border text-brand-dark px-3 py-1 rounded-full transition-colors font-bold"
+          >
+            Clear Filter
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 print:grid-cols-4">
+        <div className="card !mb-0 p-6 print:border print:shadow-none">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Total Income</div>
-          <div className="font-heading text-4xl font-bold text-brand-green mb-1">₱{income.toLocaleString()}</div>
+          <div className="font-heading text-3xl lg:text-4xl font-bold text-brand-green mb-1">₱{income.toLocaleString()}</div>
           <div className="text-sm text-brand-gray font-medium">{paid.length} paid orders</div>
         </div>
-        <div className="card !mb-0 p-6">
+        <div className="card !mb-0 p-6 print:border print:shadow-none">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Outstanding</div>
-          <div className="font-heading text-4xl font-bold text-brand-red mb-1">₱{outstanding.toLocaleString()}</div>
+          <div className="font-heading text-3xl lg:text-4xl font-bold text-brand-red mb-1">₱{outstanding.toLocaleString()}</div>
           <div className="text-sm text-brand-gray font-medium">{unpaid.length} unpaid orders</div>
         </div>
-        <div className="card !mb-0 p-6">
+        <div className="card !mb-0 p-6 print:border print:shadow-none">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Gallons Sold</div>
-          <div className="font-heading text-4xl font-bold text-brand-dark mb-1">{slimSold + roundSold}</div>
+          <div className="font-heading text-3xl lg:text-4xl font-bold text-brand-dark mb-1">{slimSold + roundSold}</div>
           <div className="text-sm text-brand-gray font-medium flex gap-3">
-            <span>🔵 {slimSold} slim</span>
-            <span>🟢 {roundSold} round</span>
+            <span>🔵 {slimSold}</span>
+            <span>🟢 {roundSold}</span>
           </div>
+        </div>
+        <div className="card !mb-0 p-6 print:border print:shadow-none">
+          <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Active Customers</div>
+          <div className="font-heading text-3xl lg:text-4xl font-bold text-brand-blue mb-1">{activeCustomersCount}</div>
+          <div className="text-sm text-brand-gray font-medium">Placed orders</div>
         </div>
       </div>
 
-      <div className="card mb-8">
+      <div className="card mb-8 print:hidden">
         <div className="card-title mb-6">{chartTitle}</div>
         <div className="h-80 w-full text-sm">
           <ResponsiveContainer width="100%" height="100%">
@@ -197,15 +230,15 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card print:shadow-none print:border-none print:p-0">
         <div className="card-header border-b border-brand-border pb-4 mb-4">
           <div>
-            <h2 className="card-title">Transaction Log</h2>
-            <div className="text-sm text-brand-gray mt-1">{periodLabels[period]}</div>
+            <h2 className="card-title print:text-2xl">Transaction Log</h2>
+            <div className="text-sm text-brand-gray mt-1">Detailed view of all transactions with exact date and time.</div>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="table-container">
+        <div className="overflow-x-auto print:overflow-visible">
+          <table className="table-container print:w-full print:text-sm">
             <thead>
               <tr>
                 <th>Date</th>
