@@ -37,7 +37,10 @@ export default function CustomerPortal() {
   const [address, setAddress] = useState(customer?.address || '');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [isSubscription, setIsSubscription] = useState(false);
+  const [scheduleType, setScheduleType] = useState<'interval' | 'weekly' | 'exact'>('interval');
   const [intervalDays, setIntervalDays] = useState(7);
+  const [weeklyDays, setWeeklyDays] = useState<number[]>([]);
+  const [exactDate, setExactDate] = useState<string>('');
   const [orderSuccess, setOrderSuccess] = useState('');
 
   // Profile Edit State
@@ -173,6 +176,16 @@ export default function CustomerPortal() {
       alert('Please enter your delivery address.');
       return;
     }
+    if (isSubscription && method === 'delivery') {
+      if (scheduleType === 'weekly' && weeklyDays.length === 0) {
+        alert('Please select at least one day of the week for your recurring delivery.');
+        return;
+      }
+      if (scheduleType === 'exact' && !exactDate) {
+        alert('Please select a specific calendar date for your scheduled delivery.');
+        return;
+      }
+    }
 
     const orderId = 'o' + Date.now();
 
@@ -275,22 +288,44 @@ export default function CustomerPortal() {
     }
 
     if (isSubscription && method === 'delivery') {
+      let nextDate = Date.now() + (intervalDays * 24 * 60 * 60 * 1000);
+      let successMsg = `✅ Order and Subscription placed! Deliveries scheduled every ${intervalDays} days.`;
+      
+      if (scheduleType === 'weekly' && weeklyDays.length > 0) {
+        let d = new Date();
+        d.setDate(d.getDate() + 1); // Start checking from tomorrow
+        d.setHours(0,0,0,0);
+        while (!weeklyDays.includes(d.getDay())) {
+          d.setDate(d.getDate() + 1);
+        }
+        nextDate = d.getTime();
+        successMsg = `✅ Order and Subscription placed! Scheduled for specific days of the week.`;
+      } else if (scheduleType === 'exact' && exactDate) {
+        nextDate = new Date(exactDate).getTime();
+        successMsg = `✅ Order and scheduled delivery placed! Next delivery on ${new Date(nextDate).toLocaleDateString()}.`;
+      }
+
       const newSub = {
         id: 'sub' + Date.now(),
         customerId: session!.id,
         customerName: session!.name,
         type: selectedType,
         qty,
+        scheduleType,
         intervalDays,
-        nextDeliveryDate: Date.now() + (intervalDays * 24 * 60 * 60 * 1000),
+        weeklyDays,
+        exactDate: scheduleType === 'exact' ? new Date(exactDate).getTime() : undefined,
+        nextDeliveryDate: nextDate,
         address: address,
         deliveryNotes: deliveryNotes.trim() || undefined,
         active: true
       };
       setSubscriptions([newSub, ...subscriptions]);
+      setOrderSuccess(successMsg);
+    } else {
+      setOrderSuccess(`✅ Order placed successfully! Total: ₱${total}. Status: Pending.`);
     }
 
-    setOrderSuccess(isSubscription ? `✅ Order and Subscription placed! Deliveries scheduled every ${intervalDays} days.` : `✅ Order placed successfully! Total: ₱${total}. Status: Pending.`);
     setQty(1);
     setReferenceNumber('');
     setDeliveryNotes('');
@@ -587,18 +622,58 @@ export default function CustomerPortal() {
                               </div>
                             </label>
                             {isSubscription && (
-                              <div className="mt-3 pt-3 border-t border-brand-border flex items-center gap-3">
-                                <span className="text-sm font-medium text-brand-gray">Deliver every</span>
-                                <select 
-                                  className="form-control text-sm py-1.5 w-32"
-                                  value={intervalDays}
-                                  onChange={e => setIntervalDays(Number(e.target.value))}
-                                >
-                                  <option value={7}>1 Week</option>
-                                  <option value={14}>2 Weeks</option>
-                                  <option value={21}>3 Weeks</option>
-                                  <option value={30}>1 Month</option>
-                                </select>
+                              <div className="mt-3 pt-3 border-t border-brand-border flex flex-col gap-3">
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  <button onClick={(e) => { e.preventDefault(); setScheduleType('interval'); }} className={`text-xs px-3 py-1.5 rounded-full font-bold transition-colors ${scheduleType === 'interval' ? 'bg-brand-blue text-white shadow-sm' : 'bg-white text-brand-gray border border-brand-border hover:bg-slate-50'}`}>Intervals</button>
+                                  <button onClick={(e) => { e.preventDefault(); setScheduleType('weekly'); }} className={`text-xs px-3 py-1.5 rounded-full font-bold transition-colors ${scheduleType === 'weekly' ? 'bg-brand-blue text-white shadow-sm' : 'bg-white text-brand-gray border border-brand-border hover:bg-slate-50'}`}>Specific Days</button>
+                                  <button onClick={(e) => { e.preventDefault(); setScheduleType('exact'); }} className={`text-xs px-3 py-1.5 rounded-full font-bold transition-colors ${scheduleType === 'exact' ? 'bg-brand-blue text-white shadow-sm' : 'bg-white text-brand-gray border border-brand-border hover:bg-slate-50'}`}>Exact Date</button>
+                                </div>
+                                
+                                {scheduleType === 'interval' && (
+                                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-brand-border">
+                                    <span className="text-sm font-medium text-brand-gray">Deliver every</span>
+                                    <select 
+                                      className="form-control text-sm py-1.5 w-32"
+                                      value={intervalDays}
+                                      onChange={e => setIntervalDays(Number(e.target.value))}
+                                    >
+                                      <option value={7}>1 Week</option>
+                                      <option value={14}>2 Weeks</option>
+                                      <option value={21}>3 Weeks</option>
+                                      <option value={30}>1 Month</option>
+                                    </select>
+                                  </div>
+                                )}
+
+                                {scheduleType === 'weekly' && (
+                                  <div className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-brand-border">
+                                    <span className="text-sm font-medium text-brand-gray mb-1">Select delivery days:</span>
+                                    <div className="flex flex-wrap gap-2">
+                                      {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((day, idx) => (
+                                        <label key={day} className="flex items-center gap-1.5 text-sm cursor-pointer bg-brand-gray-light px-2.5 py-1.5 border border-brand-border rounded-lg hover:border-brand-blue transition-colors">
+                                          <input type="checkbox" checked={weeklyDays.includes(idx)} onChange={(e) => {
+                                            if (e.target.checked) setWeeklyDays([...weeklyDays, idx]);
+                                            else setWeeklyDays(weeklyDays.filter(d => d !== idx));
+                                          }} className="rounded text-brand-blue focus:ring-brand-blue w-3.5 h-3.5 border-brand-gray" />
+                                          <span className="font-medium text-brand-dark">{day}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {scheduleType === 'exact' && (
+                                  <div className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-brand-border">
+                                    <span className="text-sm font-medium text-brand-gray">Select specific date:</span>
+                                    <input 
+                                      type="date" 
+                                      min={new Date().toISOString().split('T')[0]} 
+                                      className="form-control text-sm py-2" 
+                                      value={exactDate} 
+                                      onChange={e => setExactDate(e.target.value)} 
+                                    />
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -717,7 +792,9 @@ export default function CustomerPortal() {
                             {sub.type === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {sub.qty}
                           </div>
                           <div className="text-sm font-semibold text-brand-dark">
-                            Deliver Every {sub.intervalDays} Days
+                            {(!sub.scheduleType || sub.scheduleType === 'interval') && `Deliver Every ${sub.intervalDays} Days`}
+                            {sub.scheduleType === 'weekly' && `Weekly on ${sub.weeklyDays?.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}`}
+                            {sub.scheduleType === 'exact' && `Scheduled for ${new Date(sub.exactDate!).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}`}
                           </div>
                           <div className="text-xs text-brand-gray mt-1">
                             Next delivery: {new Date(sub.nextDeliveryDate).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}

@@ -378,7 +378,11 @@ export default function Orders() {
                       <span className="font-semibold text-brand-dark">{sub.qty}x</span>{' '}
                       <span className="text-xs text-brand-gray uppercase tracking-wider font-bold">{sub.type}</span>
                     </td>
-                    <td><span className="badge badge-paid">Every {sub.intervalDays} days</span></td>
+                    <td>
+                      {(!sub.scheduleType || sub.scheduleType === 'interval') && <span className="badge badge-paid">Every {sub.intervalDays} days</span>}
+                      {sub.scheduleType === 'weekly' && <span className="badge badge-paid">Weekly: {sub.weeklyDays?.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}</span>}
+                      {sub.scheduleType === 'exact' && <span className="badge badge-delivered">One-time: {new Date(sub.exactDate!).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</span>}
+                    </td>
                     <td className="text-sm font-semibold">
                       {sub.active ? (
                         new Date(sub.nextDeliveryDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -417,8 +421,25 @@ export default function Orders() {
                                 updateCustomerBalance(sub.customerId, newOrder.total);
                               }
 
+                              let nextDelivery = sub.nextDeliveryDate;
+                              let isActive = sub.active;
+                              
+                              if (!sub.scheduleType || sub.scheduleType === 'interval') {
+                                nextDelivery = sub.nextDeliveryDate + ((sub.intervalDays || 7) * 24 * 60 * 60 * 1000);
+                              } else if (sub.scheduleType === 'weekly' && sub.weeklyDays?.length) {
+                                let d = new Date(sub.nextDeliveryDate);
+                                d.setDate(d.getDate() + 1);
+                                d.setHours(0,0,0,0);
+                                while (!sub.weeklyDays.includes(d.getDay())) {
+                                  d.setDate(d.getDate() + 1);
+                                }
+                                nextDelivery = d.getTime();
+                              } else if (sub.scheduleType === 'exact') {
+                                isActive = false;
+                              }
+
                               setSubscriptions(subscriptions.map(s => 
-                                s.id === sub.id ? { ...s, nextDeliveryDate: s.nextDeliveryDate + (s.intervalDays * 24 * 60 * 60 * 1000) } : s
+                                s.id === sub.id ? { ...s, nextDeliveryDate: nextDelivery, active: isActive } : s
                               ));
                               alert('Order created successfully!');
                             }
@@ -442,7 +463,22 @@ export default function Orders() {
                       ) : (
                         <button 
                           onClick={() => {
-                            setSubscriptions(subscriptions.map(s => s.id === sub.id ? { ...s, active: true, nextDeliveryDate: Date.now() + (s.intervalDays * 24 * 60 * 60 * 1000) } : s));
+                            let nextDelivery = Date.now();
+                            if (!sub.scheduleType || sub.scheduleType === 'interval') {
+                              nextDelivery += ((sub.intervalDays || 7) * 24 * 60 * 60 * 1000);
+                            } else if (sub.scheduleType === 'weekly' && sub.weeklyDays?.length) {
+                              let d = new Date();
+                              d.setDate(d.getDate() + 1);
+                              d.setHours(0,0,0,0);
+                              while (!sub.weeklyDays.includes(d.getDay())) {
+                                d.setDate(d.getDate() + 1);
+                              }
+                              nextDelivery = d.getTime();
+                            } else if (sub.scheduleType === 'exact') {
+                              alert("One-time scheduled exact dates cannot be reactivated once completed. Please create a new schedule.");
+                              return;
+                            }
+                            setSubscriptions(subscriptions.map(s => s.id === sub.id ? { ...s, active: true, nextDeliveryDate: nextDelivery } : s));
                           }}
                           className="text-xs font-bold text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-full transition-colors"
                         >

@@ -52,7 +52,12 @@ export interface Subscription {
   customerName: string;
   type: 'slim' | 'round';
   qty: number;
-  intervalDays: number;
+  
+  scheduleType?: 'interval' | 'weekly' | 'exact';
+  intervalDays?: number;
+  weeklyDays?: number[];
+  exactDate?: number;
+  
   nextDeliveryDate: number;
   address: string;
   deliveryNotes?: string;
