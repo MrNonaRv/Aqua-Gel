@@ -7,7 +7,11 @@ export default function Inventory() {
   
   const [slimPrice, setSlimPrice] = useState(inventory.priceSlim.toString());
   const [roundPrice, setRoundPrice] = useState(inventory.priceRound.toString());
-  
+  const [slimDiscount, setSlimDiscount] = useState(inventory.discountSlim?.toString() || '');
+  const [slimDiscountExp, setSlimDiscountExp] = useState(inventory.discountSlimValidUntil ? new Date(inventory.discountSlimValidUntil).toISOString().split('T')[0] : '');
+  const [roundDiscount, setRoundDiscount] = useState(inventory.discountRound?.toString() || '');
+  const [roundDiscountExp, setRoundDiscountExp] = useState(inventory.discountRoundValidUntil ? new Date(inventory.discountRoundValidUntil).toISOString().split('T')[0] : '');
+
   const [slimAdd, setSlimAdd] = useState('');
   const [roundAdd, setRoundAdd] = useState('');
 
@@ -47,10 +51,23 @@ export default function Inventory() {
     const slim = parseFloat(slimPrice);
     const round = parseFloat(roundPrice);
     if (!slim || !round || slim <= 0 || round <= 0) return;
+
+    const discountS = parseFloat(slimDiscount) || undefined;
+    const discountSExp = slimDiscountExp ? new Date(slimDiscountExp + 'T23:59:59').getTime() : undefined;
+    const discountR = parseFloat(roundDiscount) || undefined;
+    const discountRExp = roundDiscountExp ? new Date(roundDiscountExp + 'T23:59:59').getTime() : undefined;
     
-    setInventory({ ...inventory, priceSlim: slim, priceRound: round });
-    logAction(`Updated pricing: Slim ₱${slim}, Round ₱${round}`);
-    showAlert('Pricing saved!');
+    setInventory({ 
+      ...inventory, 
+      priceSlim: slim, 
+      priceRound: round,
+      discountSlim: discountS,
+      discountSlimValidUntil: discountSExp,
+      discountRound: discountR,
+      discountRoundValidUntil: discountRExp
+    });
+    logAction(`Updated pricing & discounts`);
+    showAlert('Pricing and discounts saved!');
   };
 
   const maxSlim = 100;
@@ -158,19 +175,104 @@ export default function Inventory() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card">
-          <h2 className="card-title mb-6 flex items-center gap-2"><Package size={20} className="text-brand-blue" /> Update Pricing</h2>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="form-group !mb-0">
-              <label>Slim Gallon Price (₱)</label>
-              <input type="number" className="form-control" min="1" value={slimPrice} onChange={e => setSlimPrice(e.target.value)} />
+        <div className="flex flex-col gap-6">
+          <div className="card !mb-0">
+            <h2 className="card-title mb-6 flex items-center gap-2"><Package size={20} className="text-brand-blue" /> Base Pricing</h2>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="form-group !mb-0">
+                <label className="text-xs">Slim Gallon Price (₱)</label>
+                <input type="number" className="form-control py-1.5" min="1" value={slimPrice} onChange={e => setSlimPrice(e.target.value)} />
+              </div>
+              <div className="form-group !mb-0">
+                <label className="text-xs">Round Gallon Price (₱)</label>
+                <input type="number" className="form-control py-1.5" min="1" value={roundPrice} onChange={e => setRoundPrice(e.target.value)} />
+              </div>
             </div>
-            <div className="form-group !mb-0">
-              <label>Round Gallon Price (₱)</label>
-              <input type="number" className="form-control" min="1" value={roundPrice} onChange={e => setRoundPrice(e.target.value)} />
-            </div>
+            
+            <button className="btn btn-primary w-full" onClick={savePricing}>Save Pricing</button>
           </div>
-          <button className="btn btn-primary w-full" onClick={savePricing}>Save Pricing</button>
+
+          <div className="card !mb-0">
+            <h2 className="card-title mb-4 flex items-center gap-2">Promotional Discounts</h2>
+            <p className="text-xs text-brand-gray mb-6">
+              Discounts will be visible to customers until their exact expiration date. You can also manually remove them at any time to end promotions early.
+            </p>
+            
+            <div className="space-y-4 mb-6">
+              <div className="p-4 bg-brand-gray-light rounded-xl border border-brand-border">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold text-brand-dark">Slim Gallons</h3>
+                  <button 
+                    onClick={() => { setSlimDiscount(''); setSlimDiscountExp(''); }} 
+                    className="text-xs font-semibold text-brand-red hover:underline"
+                  >
+                    Remove Discount
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {[2, 5, 10].map(pct => (
+                    <button 
+                      key={pct}
+                      className="px-2.5 py-1 bg-white text-brand-dark text-xs rounded-lg border border-brand-border hover:bg-slate-50 transition-colors font-medium shadow-sm"
+                      onClick={() => setSlimDiscount((parseFloat(slimPrice) * (1 - pct/100)).toFixed(2))}
+                    >
+                      {pct}% Off
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="form-group !mb-0">
+                    <label className="text-xs">Discount Price (₱)</label>
+                    <input type="number" className="form-control py-1.5" min="0" placeholder="No discount" value={slimDiscount} onChange={e => setSlimDiscount(e.target.value)} />
+                  </div>
+                  <div className="form-group !mb-0">
+                    <label className="text-xs">Valid Until</label>
+                    <input type="date" className="form-control py-1.5" min={new Date().toISOString().split('T')[0]} value={slimDiscountExp} onChange={e => setSlimDiscountExp(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-brand-gray-light rounded-xl border border-brand-border">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold text-brand-dark">Round Gallons</h3>
+                  <button 
+                    onClick={() => { setRoundDiscount(''); setRoundDiscountExp(''); }} 
+                    className="text-xs font-semibold text-brand-red hover:underline"
+                  >
+                    Remove Discount
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {[2, 5, 10].map(pct => (
+                    <button 
+                      key={pct}
+                      className="px-2.5 py-1 bg-white text-brand-dark text-xs rounded-lg border border-brand-border hover:bg-slate-50 transition-colors font-medium shadow-sm"
+                      onClick={() => setRoundDiscount((parseFloat(roundPrice) * (1 - pct/100)).toFixed(2))}
+                    >
+                      {pct}% Off
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="form-group !mb-0">
+                    <label className="text-xs">Discount Price (₱)</label>
+                    <input type="number" className="form-control py-1.5" min="0" placeholder="No discount" value={roundDiscount} onChange={e => setRoundDiscount(e.target.value)} />
+                  </div>
+                  <div className="form-group !mb-0">
+                    <label className="text-xs">Valid Until</label>
+                    <input type="date" className="form-control py-1.5" min={new Date().toISOString().split('T')[0]} value={roundDiscountExp} onChange={e => setRoundDiscountExp(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <button className="btn btn-secondary w-full bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/20" onClick={savePricing}>Save Discounts</button>
+          </div>
         </div>
 
         <div className="card">

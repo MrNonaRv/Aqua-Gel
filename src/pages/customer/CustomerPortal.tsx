@@ -80,7 +80,22 @@ export default function CustomerPortal() {
     setQty(Math.max(1, qty + d));
   };
 
-  const unitPrice = selectedType === 'slim' ? inventory.priceSlim : inventory.priceRound;
+  const getUnitPrice = (type: 'slim' | 'round') => {
+    const now = Date.now();
+    if (type === 'slim') {
+      if (inventory.discountSlim && inventory.discountSlimValidUntil && inventory.discountSlimValidUntil >= now) {
+        return inventory.discountSlim;
+      }
+      return inventory.priceSlim;
+    } else {
+      if (inventory.discountRound && inventory.discountRoundValidUntil && inventory.discountRoundValidUntil >= now) {
+        return inventory.discountRound;
+      }
+      return inventory.priceRound;
+    }
+  };
+
+  const unitPrice = getUnitPrice(selectedType);
   const rawTotal = unitPrice * qty;
   const discount = customer?.isLoyal ? rawTotal * 0.02 : 0;
   const total = rawTotal - discount;
@@ -492,7 +507,16 @@ export default function CustomerPortal() {
                         </div>
                         <div>
                           <div className="font-bold text-brand-dark text-sm sm:text-base">Slim Gallon</div>
-                          <div className="text-brand-blue font-black mt-1">₱{inventory.priceSlim}</div>
+                          <div className="text-brand-blue font-black mt-1">
+                            {getUnitPrice('slim') < inventory.priceSlim ? (
+                              <div className="flex flex-col items-center">
+                                <span className="line-through text-brand-gray text-xs">₱{inventory.priceSlim}</span>
+                                <span>₱{getUnitPrice('slim')}</span>
+                              </div>
+                            ) : (
+                              <span>₱{inventory.priceSlim}</span>
+                            )}
+                          </div>
                           <div className="text-[11px] text-brand-gray mt-1 font-medium">{inventory.slim} available</div>
                         </div>
                       </div>
@@ -509,7 +533,16 @@ export default function CustomerPortal() {
                         </div>
                         <div>
                           <div className="font-bold text-brand-dark text-sm sm:text-base">Round Gallon</div>
-                          <div className="text-brand-blue font-black mt-1">₱{inventory.priceRound}</div>
+                          <div className="text-brand-blue font-black mt-1">
+                            {getUnitPrice('round') < inventory.priceRound ? (
+                              <div className="flex flex-col items-center">
+                                <span className="line-through text-brand-gray text-xs">₱{inventory.priceRound}</span>
+                                <span>₱{getUnitPrice('round')}</span>
+                              </div>
+                            ) : (
+                              <span>₱{inventory.priceRound}</span>
+                            )}
+                          </div>
                           <div className="text-[11px] text-brand-gray mt-1 font-medium">{inventory.round} available</div>
                         </div>
                       </div>

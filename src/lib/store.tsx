@@ -43,6 +43,7 @@ export interface Order {
   personnel: string | null;
   address: string | null;
   containerReturn: boolean;
+  deliveryNotes?: string;
   paidDate?: number;
 }
 
@@ -69,6 +70,10 @@ export interface Inventory {
   round: number;
   priceSlim: number;
   priceRound: number;
+  discountSlim?: number;
+  discountSlimValidUntil?: number;
+  discountRound?: number;
+  discountRoundValidUntil?: number;
 }
 
 export interface Settings {

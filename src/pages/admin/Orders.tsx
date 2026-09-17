@@ -22,7 +22,23 @@ export default function Orders() {
   const [methodF, setMethodF] = useState('');
   const [searchF, setSearchF] = useState('');
 
+  const [viewNote, setViewNote] = useState<{customerName: string, text: string} | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
+
+  const getUnitPrice = (type: 'slim' | 'round') => {
+    const now = Date.now();
+    if (type === 'slim') {
+      if (inventory.discountSlim && inventory.discountSlimValidUntil && inventory.discountSlimValidUntil >= now) {
+        return inventory.discountSlim;
+      }
+      return inventory.priceSlim;
+    } else {
+      if (inventory.discountRound && inventory.discountRoundValidUntil && inventory.discountRoundValidUntil >= now) {
+        return inventory.discountRound;
+      }
+      return inventory.priceRound;
+    }
+  };
   
   // Edited values
   const [eStatus, setEStatus] = useState<Order['status']>('Pending');
@@ -69,7 +85,7 @@ export default function Orders() {
   const handleAddWalkIn = () => {
     let customerName = '';
     let customerId = '';
-    const price = walkInType === 'slim' ? inventory.priceSlim : inventory.priceRound;
+    const price = getUnitPrice(walkInType);
     const total = walkInQty * price;
 
     if (walkInCustomerId === 'guest') {
@@ -301,7 +317,13 @@ export default function Orders() {
                       <div className="text-[10px] font-normal text-brand-gray mt-1 truncate max-w-[150px]" title={o.address}>📍 {o.address}</div>
                     )}
                     {o.deliveryNotes && (
-                      <div className="text-[10px] font-normal text-brand-blue bg-blue-50 px-1 py-0.5 rounded mt-1 truncate max-w-[150px]" title={o.deliveryNotes}>📝 {o.deliveryNotes}</div>
+                      <div 
+                        className="text-[10px] font-normal text-brand-blue bg-blue-50 px-1 py-0.5 rounded mt-1 truncate max-w-[150px] cursor-pointer hover:bg-blue-100 transition-colors" 
+                        title="Click to view full note"
+                        onClick={() => setViewNote({ customerName: o.customerName, text: o.deliveryNotes! })}
+                      >
+                        📝 {o.deliveryNotes}
+                      </div>
                     )}
                   </td>
                   <td>{o.type === 'slim' ? '🔵 Slim' : '🟢 Round'}</td>
@@ -405,7 +427,7 @@ export default function Orders() {
                                 method: 'delivery',
                                 paymentMethod: 'cash', // Defaulting to cash for recurring deliveries
                                 status: 'Pending',
-                                total: sub.qty * (sub.type === 'slim' ? inventory.priceSlim : inventory.priceRound),
+                                total: sub.qty * getUnitPrice(sub.type),
                                 paid: false,
                                 date: Date.now(),
                                 personnel: null,
@@ -497,6 +519,36 @@ export default function Orders() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* View Note Modal */}
+      {viewNote && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4" onClick={() => setViewNote(null)}>
+          <div 
+            className="bg-white rounded-[2rem] border-[2.5px] border-slate-900/85 p-8 max-w-sm w-full shadow-2xl relative animate-in fade-in zoom-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 font-bold transition-all hover:bg-slate-100" 
+              onClick={() => setViewNote(null)}
+            >
+              ×
+            </button>
+            <h3 className="font-heading text-xl font-bold mb-4 text-brand-dark">Customer Note</h3>
+            <p className="text-sm font-semibold text-brand-gray mb-2">From: {viewNote.customerName}</p>
+            <div className="bg-brand-gray-light p-4 rounded-xl border border-brand-border text-sm text-brand-dark whitespace-pre-wrap break-words">
+              {viewNote.text}
+            </div>
+            <div className="mt-6">
+              <button 
+                onClick={() => setViewNote(null)}
+                className="w-full btn-primary"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -617,7 +669,7 @@ export default function Orders() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Total</label>
                 <div className="w-full rounded-full border-[2px] border-slate-300 py-3 text-center text-lg font-black text-slate-850 bg-slate-50 shadow-inner">
-                  ₱{walkInQty * (walkInType === 'slim' ? inventory.priceSlim : inventory.priceRound)}
+                  ₱{walkInQty * getUnitPrice(walkInType)}
                 </div>
               </div>
 
@@ -681,7 +733,7 @@ export default function Orders() {
               {editOrder.method === 'delivery' && (
                 <>
                   {editOrder.deliveryNotes && (
-                    <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm mb-4">
+                    <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm mb-4 whitespace-pre-wrap break-words">
                       <strong className="block mb-1">Delivery Notes:</strong>
                       {editOrder.deliveryNotes}
                     </div>
