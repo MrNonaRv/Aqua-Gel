@@ -74,9 +74,13 @@ export default function Customers() {
                 <tr key={c.id}>
                   <td>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-brand-blue-light text-brand-blue flex items-center justify-center font-bold text-sm shrink-0">
-                        {c.name[0]}
-                      </div>
+                      {c.profilePictureUrl ? (
+                        <img src={c.profilePictureUrl} alt={c.name} className="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-brand-blue-light text-brand-blue flex items-center justify-center font-bold text-sm shrink-0">
+                          {c.name[0]}
+                        </div>
+                      )}
                       <div>
                         <div className="font-bold flex items-center gap-1">{c.name} {c.isLoyal && <span className="text-yellow-500" title="Loyal Customer">⭐</span>}</div>
                         {c.isLoyal ? (
@@ -117,11 +121,22 @@ export default function Customers() {
       {viewCust && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-8 max-w-lg w-full shadow-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-heading text-xl font-bold flex items-center gap-2">
-                <UserIcon size={20} className="text-brand-blue" />
-                {viewCust.name}
-              </h3>
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-4">
+                {viewCust.profilePictureUrl ? (
+                  <img src={viewCust.profilePictureUrl} alt={viewCust.name} className="w-16 h-16 rounded-full object-cover shadow-sm shrink-0" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-brand-blue-light text-brand-blue flex items-center justify-center font-heading text-2xl font-bold shrink-0">
+                    {viewCust.name[0]}
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-heading text-xl font-bold mb-1">
+                    {viewCust.name}
+                  </h3>
+                  <div className="text-sm text-brand-gray">@{viewCust.username}</div>
+                </div>
+              </div>
               <button className="text-xl text-brand-gray hover:text-brand-dark" onClick={() => { setViewCust(null); setAdjAmount(''); }}>×</button>
             </div>
 

@@ -1155,13 +1155,21 @@ export default function CustomerPortal() {
                   <div className="text-brand-gray font-medium mb-3">@{customer.username}</div>
                   {isEditingProfile ? (
                     <div className="mt-4">
-                      <label className="block text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2 text-left">Profile Picture URL (Optional)</label>
+                      <label className="block text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2 text-left">Upload Profile Picture (Optional)</label>
                       <input 
-                        type="text" 
-                        className="form-control text-sm py-2 mb-4 w-full"
-                        value={editProfilePicUrl}
-                        onChange={e => setEditProfilePicUrl(e.target.value)}
-                        placeholder="https://example.com/photo.jpg"
+                        type="file" 
+                        accept="image/*"
+                        className="form-control text-sm py-2 mb-4 w-full file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setEditProfilePicUrl(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
                       />
                     </div>
                   ) : (
