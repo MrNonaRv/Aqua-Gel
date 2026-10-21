@@ -507,11 +507,16 @@ export default function CustomerPortal() {
                         </div>
                         <div>
                           <div className="font-bold text-brand-dark text-sm sm:text-base">Slim Gallon</div>
-                          <div className="text-brand-blue font-black mt-1">
+                           <div className="text-brand-blue font-black mt-1">
                             {getUnitPrice('slim') < inventory.priceSlim ? (
                               <div className="flex flex-col items-center">
                                 <span className="line-through text-brand-gray text-xs">₱{inventory.priceSlim}</span>
                                 <span>₱{getUnitPrice('slim')}</span>
+                                {inventory.discountSlimValidUntil && (
+                                  <span className="text-[10px] text-amber-700 font-semibold mt-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                    Valid until {new Date(inventory.discountSlimValidUntil).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span>₱{inventory.priceSlim}</span>
@@ -538,6 +543,11 @@ export default function CustomerPortal() {
                               <div className="flex flex-col items-center">
                                 <span className="line-through text-brand-gray text-xs">₱{inventory.priceRound}</span>
                                 <span>₱{getUnitPrice('round')}</span>
+                                {inventory.discountRoundValidUntil && (
+                                  <span className="text-[10px] text-amber-700 font-semibold mt-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                    Valid until {new Date(inventory.discountRoundValidUntil).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span>₱{inventory.priceRound}</span>
