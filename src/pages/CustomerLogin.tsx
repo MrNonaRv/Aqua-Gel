@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../lib/store';
-import { Droplets } from 'lucide-react';
+import { Droplets, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 
@@ -18,10 +18,12 @@ export default function CustomerLogin() {
   // Fields
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const [suName, setSuName] = useState('');
   const [suUser, setSuUser] = useState('');
   const [suPass, setSuPass] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [suPhone, setSuPhone] = useState('');
   const [suAddr, setSuAddr] = useState('');
 
@@ -170,9 +172,24 @@ export default function CustomerLogin() {
                 <label className="transition-colors group-focus-within:text-brand-blue">Username</label>
                 <input type="text" className="form-control transition-all focus:ring-2 focus:ring-brand-blue/20" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter your username" />
               </div>
-              <div className="form-group mb-8 group">
+              <div className="form-group mb-8 group relative">
                 <label className="transition-colors group-focus-within:text-brand-blue">Password</label>
-                <input type="password" className="form-control transition-all focus:ring-2 focus:ring-brand-blue/20" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? 'text' : 'password'} 
+                    className="form-control transition-all focus:ring-2 focus:ring-brand-blue/20 pr-10" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    placeholder="Enter your password" 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)} 
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-gray hover:text-brand-dark focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <motion.button 
                 whileHover={{ scale: 1.02 }}
@@ -200,9 +217,24 @@ export default function CustomerLogin() {
                   <label className="transition-colors group-focus-within:text-brand-blue">Username *</label>
                   <input type="text" className="form-control transition-all focus:ring-2 focus:ring-brand-blue/20" value={suUser} onChange={e => setSuUser(e.target.value)} placeholder="Choose a username" />
                 </div>
-                <div className="form-group group">
+                <div className="form-group group relative">
                   <label className="transition-colors group-focus-within:text-brand-blue">Password *</label>
-                  <input type="password" className="form-control transition-all focus:ring-2 focus:ring-brand-blue/20" value={suPass} onChange={e => setSuPass(e.target.value)} placeholder="Create password" />
+                  <div className="relative">
+                    <input 
+                      type={showSignupPassword ? 'text' : 'password'} 
+                      className="form-control transition-all focus:ring-2 focus:ring-brand-blue/20 pr-10" 
+                      value={suPass} 
+                      onChange={e => setSuPass(e.target.value)} 
+                      placeholder="Create password" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowSignupPassword(!showSignupPassword)} 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-gray hover:text-brand-dark focus:outline-none"
+                    >
+                      {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="form-group group">
