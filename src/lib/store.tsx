@@ -186,6 +186,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
+        if (err?.code === 'permission-denied') return;
         console.error("Firestore customers sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
@@ -200,6 +201,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
+        if (err?.code === 'permission-denied') return;
         console.error("Firestore orders sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
@@ -214,6 +216,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
+        if (err?.code === 'permission-denied') return;
         console.error("Firestore subscriptions sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
@@ -228,6 +231,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
+        if (err?.code === 'permission-denied') return;
         console.error("Firestore inventory sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
@@ -242,6 +246,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
+        if (err?.code === 'permission-denied') return;
         console.error("Firestore personnel sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
@@ -256,6 +261,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
+        if (err?.code === 'permission-denied') return;
         console.error("Firestore stocklog sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
@@ -270,6 +276,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
+        if (err?.code === 'permission-denied') return;
         console.error("Firestore settings sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
@@ -300,6 +307,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const safeSetDoc = (docRef: any, data: any) => {
     if (isQuotaExhaustedRef.current) return;
     setDoc(docRef, data).catch(err => {
+      if (err?.code === 'permission-denied') return;
       console.error("Firestore write error:", err);
       if (err?.code === 'resource-exhausted') {
         isQuotaExhaustedRef.current = true;
