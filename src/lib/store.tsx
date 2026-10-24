@@ -24,6 +24,7 @@ export interface Customer extends User {
   totalGallons: number;
   isLoyal: boolean;
   profilePictureUrl?: string;
+  note?: string;
 }
 
 export interface Order {
@@ -174,34 +175,104 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('storage', handleStorage);
 
-    // Firestore real-time snapshots
+    // Firestore real-time snapshots with auto-initialization and error handling
     const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), 
-      (d) => { if (d.exists() && d.data().value) { _setCustomers(d.data().value); localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); } },
-      (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
+      (d) => { 
+        if (d.exists() && d.data().value) { 
+          _setCustomers(d.data().value); 
+          localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); 
+        } else if (!d.exists()) {
+          safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(SEED_CUSTOMERS) });
+        }
+      },
+      (err: any) => { 
+        console.error("Firestore customers sync error:", err);
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
+      }
     );
     const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), 
-      (d) => { if (d.exists() && d.data().value) { _setOrders(d.data().value); localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); } },
-      (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
+      (d) => { 
+        if (d.exists() && d.data().value) { 
+          _setOrders(d.data().value); 
+          localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); 
+        } else if (!d.exists()) {
+          safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(SEED_ORDERS) });
+        }
+      },
+      (err: any) => { 
+        console.error("Firestore orders sync error:", err);
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
+      }
     );
     const unsubSubscriptions = onSnapshot(doc(db, 'store', 'subscriptions'), 
-      (d) => { if (d.exists() && d.data().value) { _setSubscriptions(d.data().value); localStorage.setItem('ag_subscriptions', JSON.stringify(d.data().value)); } },
-      (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
+      (d) => { 
+        if (d.exists() && d.data().value) { 
+          _setSubscriptions(d.data().value); 
+          localStorage.setItem('ag_subscriptions', JSON.stringify(d.data().value)); 
+        } else if (!d.exists()) {
+          safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData([]) });
+        }
+      },
+      (err: any) => { 
+        console.error("Firestore subscriptions sync error:", err);
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
+      }
     );
     const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), 
-      (d) => { if (d.exists() && d.data().value) { _setInventory(d.data().value); localStorage.setItem('ag_inventory', JSON.stringify(d.data().value)); } },
-      (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
+      (d) => { 
+        if (d.exists() && d.data().value) { 
+          _setInventory(d.data().value); 
+          localStorage.setItem('ag_inventory', JSON.stringify(d.data().value)); 
+        } else if (!d.exists()) {
+          safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(SEED_INVENTORY) });
+        }
+      },
+      (err: any) => { 
+        console.error("Firestore inventory sync error:", err);
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
+      }
     );
     const unsubPersonnel = onSnapshot(doc(db, 'store', 'personnel'), 
-      (d) => { if (d.exists() && d.data().value) { _setPersonnel(d.data().value); localStorage.setItem('ag_personnel', JSON.stringify(d.data().value)); } },
-      (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
+      (d) => { 
+        if (d.exists() && d.data().value) { 
+          _setPersonnel(d.data().value); 
+          localStorage.setItem('ag_personnel', JSON.stringify(d.data().value)); 
+        } else if (!d.exists()) {
+          safeSetDoc(doc(db, 'store', 'personnel'), { value: cleanData(SEED_PERSONNEL) });
+        }
+      },
+      (err: any) => { 
+        console.error("Firestore personnel sync error:", err);
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
+      }
     );
     const unsubStockLog = onSnapshot(doc(db, 'store', 'stocklog'), 
-      (d) => { if (d.exists() && d.data().value) { _setStockLog(d.data().value); localStorage.setItem('ag_stocklog', JSON.stringify(d.data().value)); } },
-      (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
+      (d) => { 
+        if (d.exists() && d.data().value) { 
+          _setStockLog(d.data().value); 
+          localStorage.setItem('ag_stocklog', JSON.stringify(d.data().value)); 
+        } else if (!d.exists()) {
+          safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(SEED_STOCKLOG) });
+        }
+      },
+      (err: any) => { 
+        console.error("Firestore stocklog sync error:", err);
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
+      }
     );
     const unsubSettings = onSnapshot(doc(db, 'store', 'settings'), 
-      (d) => { if (d.exists() && d.data().value) { _setSettings(d.data().value); localStorage.setItem('ag_settings', JSON.stringify(d.data().value)); } },
-      (err: any) => { if (err?.code === 'resource-exhausted') setQuotaWarning(true); }
+      (d) => { 
+        if (d.exists() && d.data().value) { 
+          _setSettings(d.data().value); 
+          localStorage.setItem('ag_settings', JSON.stringify(d.data().value)); 
+        } else if (!d.exists()) {
+          safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(SEED_SETTINGS) });
+        }
+      },
+      (err: any) => { 
+        console.error("Firestore settings sync error:", err);
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
+      }
     );
 
     return () => {
@@ -229,6 +300,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const safeSetDoc = (docRef: any, data: any) => {
     if (isQuotaExhaustedRef.current) return;
     setDoc(docRef, data).catch(err => {
+      console.error("Firestore write error:", err);
       if (err?.code === 'resource-exhausted') {
         isQuotaExhaustedRef.current = true;
         setQuotaWarning(true);

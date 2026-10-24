@@ -1,17 +1,25 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getAuth, signInAnonymously } from 'firebase/auth';
+import firebaseConfigJson from '../../firebase-applet-config.json';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyB3fJZI1JFjfwK-bx6towsmrgVH1wjdalU",
-  authDomain: "aqua-gel.firebaseapp.com",
-  projectId: "aqua-gel",
-  storageBucket: "aqua-gel.firebasestorage.app",
-  messagingSenderId: "329354057053",
-  appId: "1:329354057053:web:eb1ef96c30e5eae9d944b4",
-  measurementId: "G-5JYK3QYLYC"
-};
-
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfigJson);
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
+}, firebaseConfigJson.firestoreDatabaseId || '(default)');
+
+export const auth = getAuth(app);
+signInAnonymously(auth).catch((err) => {
+  console.warn("Anonymous auth notice:", err);
 });
+
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn("Please check your Firebase configuration or network status.");
+    }
+  }
+}
+testConnection();

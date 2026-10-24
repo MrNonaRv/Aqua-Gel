@@ -164,6 +164,45 @@ export default function Customers() {
                     <div className="flex items-center gap-2"><Phone size={16} className="shrink-0" /> {viewCust.phone || 'N/A'}</div>
                   </div>
 
+                  {/* Customer Image Upload Section */}
+                  <div className="mb-6 p-4 bg-brand-gray-light rounded-xl border border-brand-border">
+                    <label className="block text-xs font-semibold text-brand-dark uppercase tracking-wider mb-2">Upload or Update Customer Photo</label>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      className="form-control text-xs py-1.5 w-full file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const updated = { ...viewCust, profilePictureUrl: reader.result as string };
+                            setCustomers(customers.map(c => c.id === viewCust.id ? updated : c));
+                            setViewCust(updated);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Customer Note Section */}
+                  <div className="mb-6 p-4 bg-brand-gray-light rounded-xl border border-brand-border">
+                    <label className="block text-xs font-semibold text-brand-dark uppercase tracking-wider mb-2">Customer Note / Memo</label>
+                    <textarea 
+                      className="form-control text-sm py-2 w-full mb-2"
+                      placeholder="Add admin notes about this customer (e.g. delivery preferences, special instructions)..."
+                      rows={2}
+                      value={viewCust.note || ''}
+                      onChange={e => {
+                        const updated = { ...viewCust, note: e.target.value };
+                        setViewCust(updated);
+                        setCustomers(customers.map(c => c.id === viewCust.id ? updated : c));
+                      }}
+                    />
+                    <div className="text-[11px] text-brand-gray">Notes are automatically saved as you type.</div>
+                  </div>
+
                   <div className="font-bold mb-3 flex justify-between items-end">
                     <span>Order History</span>
                     <span className="text-xs font-normal text-brand-gray">{custOrders.length} orders</span>
