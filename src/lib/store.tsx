@@ -175,115 +175,141 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('storage', handleStorage);
 
-    // Firestore real-time snapshots with auto-initialization and error handling
+    let lastFirestoreSync = 0;
+    const syncServerBackup = (key: string, value: any) => {
+      fetch(`/api/store/${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: cleanData(value) })
+      }).catch(() => {});
+    };
+
+    // Firestore real-time snapshots with auto-initialization and cross-device sync
     const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), 
       (d) => { 
-        if (d.exists() && d.data().value) { 
-          _setCustomers(d.data().value); 
-          localStorage.setItem('ag_customers', JSON.stringify(d.data().value)); 
+        if (d.exists() && d.data()?.value) { 
+          const val = d.data().value;
+          lastFirestoreSync = Date.now();
+          _setCustomers(val); 
+          localStorage.setItem('ag_customers', JSON.stringify(val)); 
+          syncServerBackup('customers', val);
         } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(SEED_CUSTOMERS) });
+          safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(SEED_CUSTOMERS), updatedAt: Date.now() });
         }
       },
       (err: any) => { 
-        if (err?.code === 'permission-denied') return;
         console.error("Firestore customers sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
     const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), 
       (d) => { 
-        if (d.exists() && d.data().value) { 
-          _setOrders(d.data().value); 
-          localStorage.setItem('ag_orders', JSON.stringify(d.data().value)); 
+        if (d.exists() && d.data()?.value) { 
+          const val = d.data().value;
+          lastFirestoreSync = Date.now();
+          _setOrders(val); 
+          localStorage.setItem('ag_orders', JSON.stringify(val)); 
+          syncServerBackup('orders', val);
         } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(SEED_ORDERS) });
+          safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(SEED_ORDERS), updatedAt: Date.now() });
         }
       },
       (err: any) => { 
-        if (err?.code === 'permission-denied') return;
         console.error("Firestore orders sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
     const unsubSubscriptions = onSnapshot(doc(db, 'store', 'subscriptions'), 
       (d) => { 
-        if (d.exists() && d.data().value) { 
-          _setSubscriptions(d.data().value); 
-          localStorage.setItem('ag_subscriptions', JSON.stringify(d.data().value)); 
+        if (d.exists() && d.data()?.value) { 
+          const val = d.data().value;
+          lastFirestoreSync = Date.now();
+          _setSubscriptions(val); 
+          localStorage.setItem('ag_subscriptions', JSON.stringify(val)); 
+          syncServerBackup('subscriptions', val);
         } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData([]) });
+          safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData([]), updatedAt: Date.now() });
         }
       },
       (err: any) => { 
-        if (err?.code === 'permission-denied') return;
         console.error("Firestore subscriptions sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
     const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), 
       (d) => { 
-        if (d.exists() && d.data().value) { 
-          _setInventory(d.data().value); 
-          localStorage.setItem('ag_inventory', JSON.stringify(d.data().value)); 
+        if (d.exists() && d.data()?.value) { 
+          const val = d.data().value;
+          lastFirestoreSync = Date.now();
+          _setInventory(val); 
+          localStorage.setItem('ag_inventory', JSON.stringify(val)); 
+          syncServerBackup('inventory', val);
         } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(SEED_INVENTORY) });
+          safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(SEED_INVENTORY), updatedAt: Date.now() });
         }
       },
       (err: any) => { 
-        if (err?.code === 'permission-denied') return;
         console.error("Firestore inventory sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
     const unsubPersonnel = onSnapshot(doc(db, 'store', 'personnel'), 
       (d) => { 
-        if (d.exists() && d.data().value) { 
-          _setPersonnel(d.data().value); 
-          localStorage.setItem('ag_personnel', JSON.stringify(d.data().value)); 
+        if (d.exists() && d.data()?.value) { 
+          const val = d.data().value;
+          lastFirestoreSync = Date.now();
+          _setPersonnel(val); 
+          localStorage.setItem('ag_personnel', JSON.stringify(val)); 
+          syncServerBackup('personnel', val);
         } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'personnel'), { value: cleanData(SEED_PERSONNEL) });
+          safeSetDoc(doc(db, 'store', 'personnel'), { value: cleanData(SEED_PERSONNEL), updatedAt: Date.now() });
         }
       },
       (err: any) => { 
-        if (err?.code === 'permission-denied') return;
         console.error("Firestore personnel sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
     const unsubStockLog = onSnapshot(doc(db, 'store', 'stocklog'), 
       (d) => { 
-        if (d.exists() && d.data().value) { 
-          _setStockLog(d.data().value); 
-          localStorage.setItem('ag_stocklog', JSON.stringify(d.data().value)); 
+        if (d.exists() && d.data()?.value) { 
+          const val = d.data().value;
+          lastFirestoreSync = Date.now();
+          _setStockLog(val); 
+          localStorage.setItem('ag_stocklog', JSON.stringify(val)); 
+          syncServerBackup('stocklog', val);
         } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(SEED_STOCKLOG) });
+          safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(SEED_STOCKLOG), updatedAt: Date.now() });
         }
       },
       (err: any) => { 
-        if (err?.code === 'permission-denied') return;
         console.error("Firestore stocklog sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
     const unsubSettings = onSnapshot(doc(db, 'store', 'settings'), 
       (d) => { 
-        if (d.exists() && d.data().value) { 
-          _setSettings(d.data().value); 
-          localStorage.setItem('ag_settings', JSON.stringify(d.data().value)); 
+        if (d.exists() && d.data()?.value) { 
+          const val = d.data().value;
+          lastFirestoreSync = Date.now();
+          _setSettings(val); 
+          localStorage.setItem('ag_settings', JSON.stringify(val)); 
+          syncServerBackup('settings', val);
         } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(SEED_SETTINGS) });
+          safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(SEED_SETTINGS), updatedAt: Date.now() });
         }
       },
       (err: any) => { 
-        if (err?.code === 'permission-denied') return;
         console.error("Firestore settings sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
 
-    // Server polling for real-time multi-device sync
+    // Fallback polling for networks where Firestore direct WebSockets/LongPolling are blocked
     const pollInterval = setInterval(async () => {
+      // If Firestore has delivered live events recently, let Firestore lead real-time push
+      if (Date.now() - lastFirestoreSync < 5000) return;
+
       const keys = ['customers', 'orders', 'subscriptions', 'inventory', 'personnel', 'stocklog', 'settings'];
       for (const key of keys) {
         try {
@@ -308,7 +334,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) {}
       }
-    }, 1500);
+    }, 2000);
 
     return () => {
       unsubCustomers(); unsubOrders(); unsubSubscriptions(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
@@ -341,7 +367,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const safeSetDoc = (docRef: any, data: any) => {
     if (isQuotaExhaustedRef.current) return;
     setDoc(docRef, data).catch(err => {
-      if (err?.code === 'permission-denied') return;
       console.error("Firestore write error:", err);
       if (err?.code === 'resource-exhausted') {
         isQuotaExhaustedRef.current = true;
@@ -353,22 +378,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setCustomers = (c: Customer[]) => { 
     _setCustomers(c); 
     broadcastAndSave('customers', c);
-    safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c) }); 
+    safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c), updatedAt: Date.now() }); 
   };
   const setOrders = (o: Order[]) => { 
     _setOrders(o); 
     broadcastAndSave('orders', o);
-    safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o) }); 
+    safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o), updatedAt: Date.now() }); 
   };
   const setSubscriptions = (subs: Subscription[]) => {
     _setSubscriptions(subs);
     broadcastAndSave('subscriptions', subs);
-    safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData(subs) });
+    safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData(subs), updatedAt: Date.now() });
   };
   const setInventory = (i: Inventory) => { 
     _setInventory(i); 
     broadcastAndSave('inventory', i);
-    safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(i) }); 
+    safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(i), updatedAt: Date.now() }); 
   };
   const setPersonnel = (p: string[]) => { 
     _setPersonnel(p); 
@@ -378,12 +403,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setStockLog = (l: { msg: string; time: number }[]) => { 
     _setStockLog(l); 
     broadcastAndSave('stocklog', l);
-    safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(l) }); 
+    safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(l), updatedAt: Date.now() }); 
   };
   const setSettings = (s: Settings) => { 
     _setSettings(s); 
     broadcastAndSave('settings', s);
-    safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(s) }); 
+    safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(s), updatedAt: Date.now() }); 
   };
 
   const updateCustomerBalance = (customerId: string, amountChange: number) => {
