@@ -9,9 +9,13 @@ export const db = initializeFirestore(app, {
 }, firebaseConfigJson.firestoreDatabaseId || '(default)');
 
 export const auth = getAuth(app);
-signInAnonymously(auth).catch((err) => {
-  console.warn("Anonymous auth notice:", err);
-});
+(async () => {
+  try {
+    await signInAnonymously(auth);
+  } catch (err) {
+    console.warn("Anonymous auth notice (falling back to local state):", err);
+  }
+})();
 
 async function testConnection() {
   try {
