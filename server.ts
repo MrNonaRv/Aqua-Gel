@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 
 async function startServer() {
@@ -77,8 +78,34 @@ async function startServer() {
     }
   });
 
-  // Real-time server store endpoints for cross-device sync
-  const persistentStore: Record<string, any> = {};
+  // Real-time server store endpoints with disk persistence for cross-device sync
+  const DATA_FILE = path.join(process.cwd(), 'data', 'store.json');
+
+  function loadStore(): Record<string, any> {
+    try {
+      if (fs.existsSync(DATA_FILE)) {
+        const content = fs.readFileSync(DATA_FILE, 'utf-8');
+        return JSON.parse(content);
+      }
+    } catch (e) {
+      console.error('Error loading store file:', e);
+    }
+    return {};
+  }
+
+  function saveStore(store: Record<string, any>) {
+    try {
+      const dir = path.dirname(DATA_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving store file:', e);
+    }
+  }
+
+  let persistentStore = loadStore();
 
   app.get('/api/store/:key', (req, res) => {
     const key = req.params.key;
@@ -89,6 +116,7 @@ async function startServer() {
     const key = req.params.key;
     const { value } = req.body;
     persistentStore[key] = value;
+    saveStore(persistentStore);
     res.json({ success: true });
   });
 

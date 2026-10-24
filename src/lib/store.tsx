@@ -308,7 +308,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) {}
       }
-    }, 2500);
+    }, 1500);
 
     return () => {
       unsubCustomers(); unsubOrders(); unsubSubscriptions(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
