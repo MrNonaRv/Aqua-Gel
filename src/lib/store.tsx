@@ -282,10 +282,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    // Server polling for real-time multi-device sync
+    const pollInterval = setInterval(async () => {
+      const keys = ['customers', 'orders', 'subscriptions', 'inventory', 'personnel', 'stocklog', 'settings'];
+      for (const key of keys) {
+        try {
+          const res = await fetch(`/api/store/${key}`);
+          const json = await res.json();
+          if (json && json.value !== null) {
+            const remoteVal = json.value;
+            const localVal = localStorage.getItem('ag_' + key);
+            const parsedLocal = localVal && localVal !== 'undefined' ? JSON.parse(localVal) : null;
+            if (JSON.stringify(remoteVal) !== JSON.stringify(parsedLocal)) {
+              localStorage.setItem('ag_' + key, JSON.stringify(remoteVal));
+              switch (key) {
+                case 'customers': _setCustomers(remoteVal); break;
+                case 'orders': _setOrders(remoteVal); break;
+                case 'subscriptions': _setSubscriptions(remoteVal); break;
+                case 'inventory': _setInventory(remoteVal); break;
+                case 'personnel': _setPersonnel(remoteVal); break;
+                case 'stocklog': _setStockLog(remoteVal); break;
+                case 'settings': _setSettings(remoteVal); break;
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }, 2500);
+
     return () => {
       unsubCustomers(); unsubOrders(); unsubSubscriptions(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
       window.removeEventListener('storage', handleStorage);
       syncChannelRef.current?.close();
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -296,6 +325,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem('ag_' + key, JSON.stringify(data));
       syncChannelRef.current?.postMessage({ type: key, data });
+      fetch(`/api/store/${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: cleanData(data) })
+      }).catch(() => {});
     } catch (e) {}
   };
 

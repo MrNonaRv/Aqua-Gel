@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../lib/store';
-import { Shield } from 'lucide-react';
+import { Shield, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function AdminLogin() {
@@ -11,6 +11,7 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = () => {
     setError('');
@@ -109,15 +110,24 @@ export default function AdminLogin() {
               placeholder="Enter admin username" 
             />
           </div>
-          <div className="form-group mb-8 group">
+          <div className="form-group mb-8 group relative">
             <label className="transition-colors group-focus-within:text-brand-blue">Password</label>
-            <input 
-              type="password" 
-              className="form-control transition-all focus:ring-2 focus:ring-brand-blue/20" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              placeholder="Enter admin password" 
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? 'text' : 'password'} 
+                className="form-control transition-all focus:ring-2 focus:ring-brand-blue/20 pr-10" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                placeholder="Enter admin password" 
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)} 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-gray hover:text-brand-dark focus:outline-none"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
           <motion.button 
             whileHover={{ scale: 1.02 }}

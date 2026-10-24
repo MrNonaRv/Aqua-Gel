@@ -77,6 +77,21 @@ async function startServer() {
     }
   });
 
+  // Real-time server store endpoints for cross-device sync
+  const persistentStore: Record<string, any> = {};
+
+  app.get('/api/store/:key', (req, res) => {
+    const key = req.params.key;
+    res.json({ value: persistentStore[key] || null });
+  });
+
+  app.post('/api/store/:key', (req, res) => {
+    const key = req.params.key;
+    const { value } = req.body;
+    persistentStore[key] = value;
+    res.json({ success: true });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
