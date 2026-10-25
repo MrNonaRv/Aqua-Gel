@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 
 export default function Dashboard() {
-  const { orders, customers, inventory } = useStore();
+  const { orders, customers, inventory, setCustomers, setOrders, setSubscriptions, setInventory, setPersonnel, setStockLog, setSettings } = useStore();
 
   const todayStart = new Date(); 
   todayStart.setHours(0, 0, 0, 0);
@@ -37,9 +37,37 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold mb-1">Dashboard</h1>
-        <p className="text-brand-gray">{todayStr}</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="font-heading text-3xl font-bold mb-1">Dashboard</h1>
+          <p className="text-brand-gray">{todayStr}</p>
+        </div>
+        <button 
+          className="btn btn-secondary text-sm"
+          onClick={() => {
+            const keys = ['customers', 'orders', 'subscriptions', 'inventory', 'personnel', 'stocklog', 'settings'];
+            keys.forEach(key => {
+              const val = localStorage.getItem('ag_' + key);
+              if (val) {
+                try {
+                  const parsed = JSON.parse(val);
+                  switch (key) {
+                    case 'customers': setCustomers(parsed); break;
+                    case 'orders': setOrders(parsed); break;
+                    case 'subscriptions': setSubscriptions(parsed); break;
+                    case 'inventory': setInventory(parsed); break;
+                    case 'personnel': setPersonnel(parsed); break;
+                    case 'stocklog': setStockLog(parsed); break;
+                    case 'settings': setSettings(parsed); break;
+                  }
+                } catch(e) {}
+              }
+            });
+            alert("Data synchronization initiated! Firestore will update shortly.");
+          }}
+        >
+          Sync Local Data to Database
+        </button>
       </div>
 
       <motion.div 

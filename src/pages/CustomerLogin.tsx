@@ -27,9 +27,7 @@ export default function CustomerLogin() {
   const [suPhone, setSuPhone] = useState('');
   const [suAddr, setSuAddr] = useState('');
   
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
-  }
+  if (loading) return <div className="flex justify-center items-center h-screen">Loading...</div>;
 
   const handleLogin = () => {
     setError('');

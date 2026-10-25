@@ -217,6 +217,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         lastFirestoreSync = Date.now();
         setLoading(false);
         if (JSON.stringify(val) !== JSON.stringify(customersRef.current)) {
+          if (val.length === 0 && customersRef.current.length > 0) return;
           _setCustomers(val); 
           localStorage.setItem('ag_customers', JSON.stringify(val)); 
           syncServerBackup('customers', val);
