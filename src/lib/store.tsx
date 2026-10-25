@@ -136,6 +136,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [quotaWarning, setQuotaWarning] = useState<boolean>(false);
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
 
+  const customersRef = useRef(customers);
+  const ordersRef = useRef(orders);
+  const subscriptionsRef = useRef(subscriptions);
+  const inventoryRef = useRef(inventory);
+  const personnelRef = useRef(personnel);
+  const stockLogRef = useRef(stockLog);
+  const settingsRef = useRef(settings);
+
+  useEffect(() => {
+    customersRef.current = customers;
+    ordersRef.current = orders;
+    subscriptionsRef.current = subscriptions;
+    inventoryRef.current = inventory;
+    personnelRef.current = personnel;
+    stockLogRef.current = stockLog;
+    settingsRef.current = settings;
+  }, [customers, orders, subscriptions, inventory, personnel, stockLog, settings]);
+
   useEffect(() => {
     // Multi-tab real-time sync via BroadcastChannel
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -190,9 +208,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (d.exists() && d.data()?.value) { 
           const val = d.data().value;
           lastFirestoreSync = Date.now();
-          _setCustomers(val); 
-          localStorage.setItem('ag_customers', JSON.stringify(val)); 
-          syncServerBackup('customers', val);
+          if (JSON.stringify(val) !== JSON.stringify(customersRef.current)) {
+            _setCustomers(val); 
+            localStorage.setItem('ag_customers', JSON.stringify(val)); 
+            syncServerBackup('customers', val);
+          }
         } else if (!d.exists()) {
           safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(SEED_CUSTOMERS), updatedAt: Date.now() });
         }
@@ -207,9 +227,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (d.exists() && d.data()?.value) { 
           const val = d.data().value;
           lastFirestoreSync = Date.now();
-          _setOrders(val); 
-          localStorage.setItem('ag_orders', JSON.stringify(val)); 
-          syncServerBackup('orders', val);
+          if (JSON.stringify(val) !== JSON.stringify(ordersRef.current)) {
+            _setOrders(val); 
+            localStorage.setItem('ag_orders', JSON.stringify(val)); 
+            syncServerBackup('orders', val);
+          }
         } else if (!d.exists()) {
           safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(SEED_ORDERS), updatedAt: Date.now() });
         }
@@ -224,9 +246,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (d.exists() && d.data()?.value) { 
           const val = d.data().value;
           lastFirestoreSync = Date.now();
-          _setSubscriptions(val); 
-          localStorage.setItem('ag_subscriptions', JSON.stringify(val)); 
-          syncServerBackup('subscriptions', val);
+          if (JSON.stringify(val) !== JSON.stringify(subscriptionsRef.current)) {
+            _setSubscriptions(val); 
+            localStorage.setItem('ag_subscriptions', JSON.stringify(val)); 
+            syncServerBackup('subscriptions', val);
+          }
         } else if (!d.exists()) {
           safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData([]), updatedAt: Date.now() });
         }
@@ -241,9 +265,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (d.exists() && d.data()?.value) { 
           const val = d.data().value;
           lastFirestoreSync = Date.now();
-          _setInventory(val); 
-          localStorage.setItem('ag_inventory', JSON.stringify(val)); 
-          syncServerBackup('inventory', val);
+          if (JSON.stringify(val) !== JSON.stringify(inventoryRef.current)) {
+            _setInventory(val); 
+            localStorage.setItem('ag_inventory', JSON.stringify(val)); 
+            syncServerBackup('inventory', val);
+          }
         } else if (!d.exists()) {
           safeSetDoc(doc(db, 'store', 'inventory'), { value: cleanData(SEED_INVENTORY), updatedAt: Date.now() });
         }
@@ -258,9 +284,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (d.exists() && d.data()?.value) { 
           const val = d.data().value;
           lastFirestoreSync = Date.now();
-          _setPersonnel(val); 
-          localStorage.setItem('ag_personnel', JSON.stringify(val)); 
-          syncServerBackup('personnel', val);
+          if (JSON.stringify(val) !== JSON.stringify(personnelRef.current)) {
+            _setPersonnel(val); 
+            localStorage.setItem('ag_personnel', JSON.stringify(val)); 
+            syncServerBackup('personnel', val);
+          }
         } else if (!d.exists()) {
           safeSetDoc(doc(db, 'store', 'personnel'), { value: cleanData(SEED_PERSONNEL), updatedAt: Date.now() });
         }
@@ -275,9 +303,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (d.exists() && d.data()?.value) { 
           const val = d.data().value;
           lastFirestoreSync = Date.now();
-          _setStockLog(val); 
-          localStorage.setItem('ag_stocklog', JSON.stringify(val)); 
-          syncServerBackup('stocklog', val);
+          if (JSON.stringify(val) !== JSON.stringify(stockLogRef.current)) {
+            _setStockLog(val); 
+            localStorage.setItem('ag_stocklog', JSON.stringify(val)); 
+            syncServerBackup('stocklog', val);
+          }
         } else if (!d.exists()) {
           safeSetDoc(doc(db, 'store', 'stocklog'), { value: cleanData(SEED_STOCKLOG), updatedAt: Date.now() });
         }
@@ -292,9 +322,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (d.exists() && d.data()?.value) { 
           const val = d.data().value;
           lastFirestoreSync = Date.now();
-          _setSettings(val); 
-          localStorage.setItem('ag_settings', JSON.stringify(val)); 
-          syncServerBackup('settings', val);
+          if (JSON.stringify(val) !== JSON.stringify(settingsRef.current)) {
+            _setSettings(val); 
+            localStorage.setItem('ag_settings', JSON.stringify(val)); 
+            syncServerBackup('settings', val);
+          }
         } else if (!d.exists()) {
           safeSetDoc(doc(db, 'store', 'settings'), { value: cleanData(SEED_SETTINGS), updatedAt: Date.now() });
         }
