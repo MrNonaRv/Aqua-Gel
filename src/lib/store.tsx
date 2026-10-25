@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
-import { doc, onSnapshot, setDoc, setLogLevel } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, setLogLevel, collection, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { db } from './firebase';
 
 // Suppress excessive console debug logs from Firestore internal backoff
@@ -84,6 +84,7 @@ export interface Settings {
 }
 
 interface StoreContextType {
+  loading: boolean;
   session: User | null;
   setSession: (user: User | null) => void;
   customers: Customer[];
@@ -126,6 +127,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   const [session, _setSession] = useState<User | null>(() => getInitialState('ag_session', null));
+  const [loading, setLoading] = useState(true);
   const [customers, _setCustomers] = useState<Customer[]>(() => getInitialState('ag_customers', SEED_CUSTOMERS));
   const [orders, _setOrders] = useState<Order[]>(() => getInitialState('ag_orders', SEED_ORDERS));
   const [subscriptions, _setSubscriptions] = useState<Subscription[]>(() => getInitialState('ag_subscriptions', []));
@@ -152,6 +154,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     personnelRef.current = personnel;
     stockLogRef.current = stockLog;
     settingsRef.current = settings;
+    
+    // One-time migration of customers to collection
+    customers.forEach(customer => {
+        const { id, ...data } = customer;
+        safeSetDoc(doc(db, 'customers', id), data);
+    });
   }, [customers, orders, subscriptions, inventory, personnel, stockLog, settings]);
 
   useEffect(() => {
@@ -203,22 +211,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
 
     // Firestore real-time snapshots with auto-initialization and cross-device sync
-    const unsubCustomers = onSnapshot(doc(db, 'store', 'customers'), 
-      (d) => { 
-        if (d.exists() && d.data()?.value) { 
-          const val = d.data().value;
-          lastFirestoreSync = Date.now();
-          if (JSON.stringify(val) !== JSON.stringify(customersRef.current)) {
-            _setCustomers(val); 
-            localStorage.setItem('ag_customers', JSON.stringify(val)); 
-            syncServerBackup('customers', val);
-          }
-        } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(SEED_CUSTOMERS), updatedAt: Date.now() });
+    const unsubCustomers = onSnapshot(collection(db, 'customers'), 
+      (snapshot: QuerySnapshot<DocumentData>) => { 
+        const val: Customer[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        lastFirestoreSync = Date.now();
+        setLoading(false);
+        if (JSON.stringify(val) !== JSON.stringify(customersRef.current)) {
+          _setCustomers(val); 
+          localStorage.setItem('ag_customers', JSON.stringify(val)); 
+          syncServerBackup('customers', val);
         }
       },
       (err: any) => { 
         console.error("Firestore customers sync error:", err);
+        setLoading(false);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
@@ -407,10 +413,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const setCustomers = (c: Customer[]) => { 
+  const setCustomers = async (c: Customer[]) => { 
     _setCustomers(c); 
     broadcastAndSave('customers', c);
-    safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c), updatedAt: Date.now() }); 
+    // Backward compatibility: keep updating the single document
+    await safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c), updatedAt: Date.now() }); 
+    // Migrate to collections
+    await Promise.all(c.map(customer => {
+        const { id, ...data } = customer;
+        return safeSetDoc(doc(db, 'customers', id), data);
+    }));
   };
   const setOrders = (o: Order[]) => { 
     _setOrders(o); 
@@ -465,6 +477,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
+      loading,
       session, setSession,
       customers: customersWithLoyalty, setCustomers,
       orders, setOrders,

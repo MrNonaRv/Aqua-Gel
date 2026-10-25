@@ -7,14 +7,14 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function CustomerLogin() {
   const [tab, setTab] = useState<'login' | 'signup'>('login');
-  const { customers, setCustomers, setSession } = useStore();
+  const { customers, setCustomers, setSession, loading } = useStore();
   const navigate = useNavigate();
   useEffect(() => {
     try { const sess = JSON.parse(localStorage.getItem('ag_session') || '{}'); if (sess?.role === 'customer') navigate('/customer'); } catch(e){}
   }, [navigate]);
 
   const [error, setError] = useState('');
-
+  
   // Fields
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -26,10 +26,16 @@ export default function CustomerLogin() {
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [suPhone, setSuPhone] = useState('');
   const [suAddr, setSuAddr] = useState('');
+  
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
 
   const handleLogin = () => {
     setError('');
+    console.log('Logging in, customers:', customers);
     const found = customers.find(c => c.username === username && c.password === password);
+    console.log('Found user:', found);
     if (found) {
       setSession({ id: found.id, name: found.name, username: found.username, role: 'customer' });
       navigate('/customer');
@@ -38,8 +44,9 @@ export default function CustomerLogin() {
     }
   };
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     setError('');
+    console.log('Signing up:', suUser);
     if (!suName || !suUser || !suPass || !suAddr) {
       setError('Please fill in all required fields (*)');
       return;
@@ -59,7 +66,8 @@ export default function CustomerLogin() {
       isLoyal: false,
       role: 'customer' as const
     };
-    setCustomers([...customers, newCustomer]);
+    console.log('New customer to set:', newCustomer);
+    await setCustomers([...customers, newCustomer]);
     setSession({ id: newCustomer.id, name: newCustomer.name, username: newCustomer.username, role: 'customer' });
     navigate('/customer');
   };

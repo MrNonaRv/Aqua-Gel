@@ -1,54 +1,43 @@
 {
-  "collections": [
-    {
-      "name": "users",
-      "description": "User accounts, including both customers and admins.",
-      "fields": [
-        { "name": "role", "type": "string", "description": "'admin' or 'customer'" },
-        { "name": "name", "type": "string" },
-        { "name": "username", "type": "string" },
-        { "name": "phone", "type": "string" },
-        { "name": "address", "type": "string" },
-        { "name": "unpaid", "type": "number" }
-      ]
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer entity",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "unpaid": { "type": "number" },
+        "totalGallons": { "type": "number" },
+        "isLoyal": { "type": "boolean" },
+        "profilePictureUrl": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["name", "username", "role", "phone", "address"]
     },
-    {
-      "name": "orders",
-      "description": "Customer orders",
-      "fields": [
-        { "name": "customerId", "type": "string" },
-        { "name": "customerName", "type": "string" },
-        { "name": "type", "type": "string" },
-        { "name": "qty", "type": "number" },
-        { "name": "method", "type": "string" },
-        { "name": "paymentMethod", "type": "string" },
-        { "name": "referenceNumber", "type": "string" },
-        { "name": "status", "type": "string" },
-        { "name": "total", "type": "number" },
-        { "name": "paid", "type": "boolean" },
-        { "name": "date", "type": "number" },
-        { "name": "paidDate", "type": "number" },
-        { "name": "personnel", "type": "string" },
-        { "name": "address", "type": "string" },
-        { "name": "containerReturn", "type": "boolean" }
-      ]
-    },
-    {
-      "name": "config",
-      "description": "Global settings and config singletons",
-      "fields": [
-        { "name": "inventory", "type": "map" },
-        { "name": "personnel", "type": "array" },
-        { "name": "settings", "type": "map" }
-      ]
-    },
-    {
-      "name": "stockLog",
-      "description": "Logs for stock changes",
-      "fields": [
-        { "name": "msg", "type": "string" },
-        { "name": "time", "type": "number" }
-      ]
+    "Order": {
+        "title": "Order",
+        "description": "Order entity",
+        "type": "object",
+        "properties": {
+            "customerId": { "type": "string" },
+            "customerName": { "type": "string" },
+            "status": { "type": "string" }
+        },
+        "required": ["customerId", "customerName", "status"]
     }
-  ]
+  },
+  "firestore": {
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer records"
+    },
+    "/orders/{orderId}": {
+        "schema": { "$ref": "#/entities/Order" },
+        "description": "Order records"
+    }
+  }
 }
