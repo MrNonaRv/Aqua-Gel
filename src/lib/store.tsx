@@ -231,6 +231,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     );
     const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), 
       (d) => { 
+        console.log('Orders onSnapshot received:', d.exists(), d.data()?.value?.length);
         if (d.exists() && d.data()?.value) { 
           const val = d.data().value;
           lastFirestoreSync = Date.now();
@@ -404,9 +405,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [quotaWarning]);
 
   const safeSetDoc = (docRef: any, data: any) => {
-    if (isQuotaExhaustedRef.current) return;
-    setDoc(docRef, data).catch(err => {
-      console.error("Firestore write error:", err);
+    console.log('safeSetDoc called for:', docRef.path);
+    if (isQuotaExhaustedRef.current) {
+        console.log('safeSetDoc skipped due to quota exhaustion');
+        return;
+    }
+    setDoc(docRef, data).then(() => {
+        console.log('safeSetDoc success for:', docRef.path);
+    }).catch(err => {
+      console.error("Firestore write error for:", docRef.path, err);
       if (err?.code === 'resource-exhausted') {
         isQuotaExhaustedRef.current = true;
         setQuotaWarning(true);
@@ -428,6 +435,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setOrders = (o: Order[] | ((prev: Order[]) => Order[])) => {
     _setOrders(prev => {
         const next = typeof o === 'function' ? o(prev) : o;
+        console.log('setOrders called, new orders length:', next.length);
         broadcastAndSave('orders', next);
         safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(next), updatedAt: Date.now() }); 
         return next;
