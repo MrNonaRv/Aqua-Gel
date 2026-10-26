@@ -104,7 +104,7 @@ export default function Orders() {
         isLoyal: false,
         role: 'customer'
       };
-      setCustomers([...customers, newGuestCustomer]);
+      setCustomers(prev => [...prev, newGuestCustomer]);
     } else {
       if (!walkInCustomerId) return;
       const customer = customers.find(c => c.id === walkInCustomerId);
@@ -131,7 +131,7 @@ export default function Orders() {
       containerReturn: false,
     };
 
-    setOrders([newOrder, ...orders]);
+    setOrders(prev => [newOrder, ...prev]);
 
     if (walkInCustomerId !== 'guest' && !walkInPaid) {
       updateCustomerBalance(customerId, total);
@@ -210,7 +210,7 @@ export default function Orders() {
       }
     }
 
-    setOrders(updated);
+    setOrders(prev => prev.map(o => o.id === editOrder.id ? { ...o, status: eStatus, personnel: ePersonnel || null, paid: ePaid, paidDate: parsedPaidDate, containerReturn: eReturn } : o));
     
     if (editOrder.status !== eStatus) {
       notifyStatusChange(editOrder.customerId, editOrder.id, eStatus);
@@ -223,13 +223,13 @@ export default function Orders() {
     if (order.paid) return;
     const updated = orders.map(o => o.id === order.id ? { ...o, paid: true, paidDate: Date.now() } : o);
     updateCustomerBalance(order.customerId, -order.total);
-    setOrders(updated);
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, paid: true, paidDate: Date.now() } : o));
   };
 
   const markClaimed = (order: Order) => {
     if (order.status === 'Cancelled') return;
     const updated = orders.map(o => o.id === order.id ? { ...o, status: 'Delivered' } : o);
-    setOrders(updated);
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'Delivered' } : o));
     toast.success('Order Marked Claimed');
   };
 
@@ -450,7 +450,7 @@ export default function Orders() {
                                 containerReturn: false,
                                 deliveryNotes: sub.deliveryNotes
                               };
-                              setOrders([newOrder, ...orders]);
+                              setOrders(prev => [newOrder, ...prev]);
                               setInventory({ ...inventory, [sub.type]: inventory[sub.type] - sub.qty });
                               
                               const customer = customers.find(c => c.id === sub.customerId);

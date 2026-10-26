@@ -425,10 +425,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return safeSetDoc(doc(db, 'customers', id), data);
     }));
   };
-  const setOrders = (o: Order[]) => { 
-    _setOrders(o); 
-    broadcastAndSave('orders', o);
-    safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o), updatedAt: Date.now() }); 
+  const setOrders = (o: Order[] | ((prev: Order[]) => Order[])) => {
+    _setOrders(prev => {
+        const next = typeof o === 'function' ? o(prev) : o;
+        broadcastAndSave('orders', next);
+        safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(next), updatedAt: Date.now() }); 
+        return next;
+    });
   };
   const setSubscriptions = (subs: Subscription[]) => {
     _setSubscriptions(subs);
