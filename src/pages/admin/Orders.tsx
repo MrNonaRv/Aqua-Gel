@@ -226,6 +226,12 @@ export default function Orders() {
     setOrders(updated);
   };
 
+  const markClaimed = (order: Order) => {
+    const updated = orders.map(o => o.id === order.id ? { ...o, status: 'Claimed' as const, claimedAt: Date.now() } : o);
+    setOrders(updated);
+    toast.success('Order marked as Claimed');
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
@@ -269,6 +275,7 @@ export default function Orders() {
             <option value="Pending">Pending</option>
             <option value="Out for Delivery">Out for Delivery</option>
             <option value="Delivered">Delivered</option>
+            <option value="Claimed">Claimed</option>
             <option value="Cancelled">Cancelled</option>
           </select>
           <select className="form-control w-auto py-2 px-3 text-sm" value={paidF} onChange={e => setPaidF(e.target.value)}>
@@ -348,10 +355,13 @@ export default function Orders() {
                       )}
                     </div>
                   </td>
-                  <td><span className={`badge ${o.status === 'Pending' ? 'badge-pending' : o.status === 'Out for Delivery' ? 'badge-delivery' : o.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'badge-delivered'}`}>{o.status}</span></td>
+                  <td><span className={`badge ${o.status === 'Pending' ? 'badge-pending' : o.status === 'Out for Delivery' ? 'badge-delivery' : o.status === 'Claimed' ? 'badge-delivered' : o.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'badge-delivered'}`}>{o.status}</span></td>
                   <td>
                     <div className="flex gap-2">
                       <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(o)}>Edit</button>
+                      {o.method === 'pickup' && o.status === 'Pending' && (
+                        <button className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" onClick={() => markClaimed(o)}>Claimed</button>
+                      )}
                       {!o.paid && (
                         <button className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" onClick={() => markPaid(o)}>Mark Paid</button>
                       )}
@@ -749,6 +759,7 @@ export default function Orders() {
                         <option value="Pending">Pending</option>
                         <option value="Out for Delivery">Out for Delivery</option>
                         <option value="Delivered">Delivered</option>
+                        <option value="Claimed">Claimed</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">

@@ -37,7 +37,7 @@ export interface Order {
   paymentMethod?: 'cash' | 'gcash';
   referenceNumber?: string;
   checkoutUrl?: string;
-  status: 'Pending' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
+  status: 'Pending' | 'Out for Delivery' | 'Delivered' | 'Claimed' | 'Cancelled';
   total: number;
   paid: boolean;
   date: number;
@@ -46,6 +46,7 @@ export interface Order {
   containerReturn: boolean;
   deliveryNotes?: string;
   paidDate?: number;
+  claimedAt?: number;
 }
 
 export interface Subscription {

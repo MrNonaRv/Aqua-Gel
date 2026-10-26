@@ -225,7 +225,7 @@ export default function CustomerPortal() {
           containerReturn: false
         };
 
-        setOrders([newOrder, ...orders]);
+        setOrders(prev => [newOrder, ...prev]);
         setInventory({ ...inventory, [selectedType]: inventory[selectedType] - qty });
         if (customer) {
           setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: c.unpaid + total } : c));
@@ -248,7 +248,7 @@ export default function CustomerPortal() {
         
         if (data.checkoutUrl) {
           // Save the checkout URL to the order so it can be resumed
-          setOrders([newOrder, ...orders].map(o => o.id === orderId ? { ...o, checkoutUrl: data.checkoutUrl } : o));
+          setOrders(prev => prev.map(o => o.id === orderId ? { ...o, checkoutUrl: data.checkoutUrl } : o));
 
           window.location.href = data.checkoutUrl;
           setTab('myorders');
@@ -256,7 +256,7 @@ export default function CustomerPortal() {
         } else {
           alert('Failed to initialize payment gateway: ' + (data.error || 'Unknown error'));
           // Revert order if gateway fails
-          setOrders(orders.filter(o => o.id !== orderId));
+          setOrders(prev => prev.filter(o => o.id !== orderId));
           setInventory({ ...inventory, [selectedType]: inventory[selectedType] + qty });
           if (customer) setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: Math.max(0, c.unpaid - total) } : c));
         }
@@ -264,7 +264,7 @@ export default function CustomerPortal() {
         console.error(err);
         alert('Network error. Please try again.');
         // Revert order
-        setOrders(orders.filter(o => o.id !== orderId));
+        setOrders(prev => prev.filter(o => o.id !== orderId));
         setInventory({ ...inventory, [selectedType]: inventory[selectedType] + qty });
         if (customer) setCustomers(customers.map(c => c.id === customer.id ? { ...c, unpaid: Math.max(0, c.unpaid - total) } : c));
       } finally {
@@ -294,7 +294,7 @@ export default function CustomerPortal() {
       deliveryNotes: deliveryNotes.trim() || undefined
     };
 
-    setOrders([newOrder, ...orders]);
+    setOrders(prev => [newOrder, ...prev]);
     setInventory({ ...inventory, [selectedType]: inventory[selectedType] - qty });
     
     // Update unpaid balance
