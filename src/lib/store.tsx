@@ -89,11 +89,11 @@ interface StoreContextType {
   session: User | null;
   setSession: (user: User | null) => void;
   customers: Customer[];
-  setCustomers: (customers: Customer[]) => void;
+  setCustomers: (customers: Customer[] | ((prev: Customer[]) => Customer[])) => void;
   orders: Order[];
-  setOrders: (orders: Order[]) => void;
+  setOrders: (orders: Order[] | ((prev: Order[]) => Order[])) => void;
   subscriptions: Subscription[];
-  setSubscriptions: (subs: Subscription[]) => void;
+  setSubscriptions: (subs: Subscription[] | ((prev: Subscription[]) => Subscription[])) => void;
   inventory: Inventory;
   setInventory: (inventory: Inventory) => void;
   personnel: string[];
@@ -139,6 +139,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [quotaWarning, setQuotaWarning] = useState<boolean>(false);
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
 
+
+
   const customersRef = useRef(customers);
   const ordersRef = useRef(orders);
   const subscriptionsRef = useRef(subscriptions);
@@ -156,10 +158,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     stockLogRef.current = stockLog;
     settingsRef.current = settings;
     
-    // One-time migration of customers to collection
+    // One-time migration of customers and orders to collections
     customers.forEach(customer => {
         const { id, ...data } = customer;
-        safeSetDoc(doc(db, 'customers', id), data);
+        safeSetDoc(doc(db, 'customers', id), cleanData(data));
+    });
+    orders.forEach(order => {
+        const { id, ...data } = order;
+        safeSetDoc(doc(db, 'orders', id), cleanData(data));
     });
   }, [customers, orders, subscriptions, inventory, personnel, stockLog, settings]);
 
@@ -203,13 +209,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.addEventListener('storage', handleStorage);
 
     let lastFirestoreSync = 0;
-    const syncServerBackup = (key: string, value: any) => {
-      fetch(`/api/store/${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: cleanData(value) })
-      }).catch(() => {});
-    };
 
     // Firestore real-time snapshots with auto-initialization and cross-device sync
     const unsubCustomers = onSnapshot(collection(db, 'customers'), 
@@ -230,18 +229,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
-    const unsubOrders = onSnapshot(doc(db, 'store', 'orders'), 
-      (d) => { 
-        if (d.exists() && d.data()?.value) { 
-          const val = d.data().value;
-          lastFirestoreSync = Date.now();
-          if (JSON.stringify(val) !== JSON.stringify(ordersRef.current)) {
-            _setOrders(val); 
-            localStorage.setItem('ag_orders', JSON.stringify(val)); 
-            syncServerBackup('orders', val);
-          }
-        } else if (!d.exists()) {
-          safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(SEED_ORDERS), updatedAt: Date.now() });
+    const unsubOrders = onSnapshot(collection(db, 'orders'), 
+      (snapshot: QuerySnapshot<DocumentData>) => { 
+        const val: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        lastFirestoreSync = Date.now();
+        if (JSON.stringify(val) !== JSON.stringify(ordersRef.current)) {
+          if (val.length === 0 && ordersRef.current.length > 0) return;
+          _setOrders(val); 
+          localStorage.setItem('ag_orders', JSON.stringify(val)); 
+          syncServerBackup('orders', val);
         }
       },
       (err: any) => { 
@@ -385,6 +381,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const cleanData = (data: any) => JSON.parse(JSON.stringify(data));
+  const syncServerBackup = (key: string, value: any) => {
+    fetch(`/api/store/${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: cleanData(value) })
+    }).catch(() => {});
+  };
   const setSession = (s: User | null) => { _setSession(s); localStorage.setItem('ag_session', JSON.stringify(s)); };
   
   const broadcastAndSave = (key: string, data: any) => {
@@ -415,26 +418,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const setCustomers = async (c: Customer[]) => { 
-    _setCustomers(c); 
-    broadcastAndSave('customers', c);
-    // Backward compatibility: keep updating the single document
-    await safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c), updatedAt: Date.now() }); 
-    // Migrate to collections
-    await Promise.all(c.map(customer => {
-        const { id, ...data } = customer;
-        return safeSetDoc(doc(db, 'customers', id), data);
-    }));
+  const setCustomers = (updater: Customer[] | ((prev: Customer[]) => Customer[])) => { 
+    _setCustomers(prev => {
+      const c = typeof updater === 'function' ? updater(prev) : updater;
+      broadcastAndSave('customers', c);
+      safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c), updatedAt: Date.now() }); 
+      c.forEach(customer => {
+          const { id, ...data } = customer;
+          safeSetDoc(doc(db, 'customers', id), cleanData(data));
+      });
+      return c;
+    });
   };
-  const setOrders = (o: Order[]) => { 
-    _setOrders(o); 
-    broadcastAndSave('orders', o);
-    safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o), updatedAt: Date.now() }); 
+  const setOrders = (updater: Order[] | ((prev: Order[]) => Order[])) => { 
+    _setOrders(prev => {
+      const o = typeof updater === 'function' ? updater(prev) : updater;
+      broadcastAndSave('orders', o);
+      syncServerBackup('orders', o);
+      o.forEach(order => {
+          const { id, ...data } = order;
+          safeSetDoc(doc(db, 'orders', id), cleanData(data));
+      });
+      return o;
+    });
   };
-  const setSubscriptions = (subs: Subscription[]) => {
-    _setSubscriptions(subs);
-    broadcastAndSave('subscriptions', subs);
-    safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData(subs), updatedAt: Date.now() });
+  const setSubscriptions = (updater: Subscription[] | ((prev: Subscription[]) => Subscription[])) => {
+    _setSubscriptions(prev => {
+      const subs = typeof updater === 'function' ? updater(prev) : updater;
+      broadcastAndSave('subscriptions', subs);
+      safeSetDoc(doc(db, 'store', 'subscriptions'), { value: cleanData(subs), updatedAt: Date.now() });
+      return subs;
+    });
   };
   const setInventory = (i: Inventory) => { 
     _setInventory(i); 
