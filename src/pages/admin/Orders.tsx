@@ -104,7 +104,7 @@ export default function Orders() {
         isLoyal: false,
         role: 'customer'
       };
-      setCustomers(prev => [...prev, newGuestCustomer]);
+      setCustomers([...customers, newGuestCustomer]);
     } else {
       if (!walkInCustomerId) return;
       const customer = customers.find(c => c.id === walkInCustomerId);
@@ -131,7 +131,7 @@ export default function Orders() {
       containerReturn: false,
     };
 
-    setOrders(prev => [newOrder, ...prev]);
+    setOrders([newOrder, ...orders]);
 
     if (walkInCustomerId !== 'guest' && !walkInPaid) {
       updateCustomerBalance(customerId, total);
@@ -210,7 +210,7 @@ export default function Orders() {
       }
     }
 
-    setOrders(prev => prev.map(o => o.id === editOrder.id ? { ...o, status: eStatus, personnel: ePersonnel || null, paid: ePaid, paidDate: parsedPaidDate, containerReturn: eReturn } : o));
+    setOrders(updated);
     
     if (editOrder.status !== eStatus) {
       notifyStatusChange(editOrder.customerId, editOrder.id, eStatus);
@@ -223,14 +223,7 @@ export default function Orders() {
     if (order.paid) return;
     const updated = orders.map(o => o.id === order.id ? { ...o, paid: true, paidDate: Date.now() } : o);
     updateCustomerBalance(order.customerId, -order.total);
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, paid: true, paidDate: Date.now() } : o));
-  };
-
-  const markClaimed = (order: Order) => {
-    if (order.status === 'Cancelled') return;
-    const updated = orders.map(o => o.id === order.id ? { ...o, status: 'Delivered' } : o);
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'Delivered' } : o));
-    toast.success('Order Marked Claimed');
+    setOrders(updated);
   };
 
   return (
@@ -359,14 +352,6 @@ export default function Orders() {
                   <td>
                     <div className="flex gap-2">
                       <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(o)}>Edit</button>
-                      {o.method === 'pickup' && (o.status === 'Pending' || o.status === 'Ready') && (
-                        <button 
-                          className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" 
-                          onClick={() => markClaimed(o)}
-                        >
-                          Claimed
-                        </button>
-                      )}
                       {!o.paid && (
                         <button className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" onClick={() => markPaid(o)}>Mark Paid</button>
                       )}
@@ -450,7 +435,7 @@ export default function Orders() {
                                 containerReturn: false,
                                 deliveryNotes: sub.deliveryNotes
                               };
-                              setOrders(prev => [newOrder, ...prev]);
+                              setOrders([newOrder, ...orders]);
                               setInventory({ ...inventory, [sub.type]: inventory[sub.type] - sub.qty });
                               
                               const customer = customers.find(c => c.id === sub.customerId);
