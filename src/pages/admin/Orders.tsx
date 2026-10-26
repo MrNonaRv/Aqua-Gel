@@ -226,6 +226,13 @@ export default function Orders() {
     setOrders(updated);
   };
 
+  const markClaimed = (order: Order) => {
+    if (order.status === 'Cancelled') return;
+    const updated = orders.map(o => o.id === order.id ? { ...o, status: 'Delivered' } : o);
+    setOrders(updated);
+    toast.success('Order Marked Claimed');
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
@@ -352,6 +359,14 @@ export default function Orders() {
                   <td>
                     <div className="flex gap-2">
                       <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(o)}>Edit</button>
+                      {o.method === 'pickup' && (o.status === 'Pending' || o.status === 'Ready') && (
+                        <button 
+                          className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" 
+                          onClick={() => markClaimed(o)}
+                        >
+                          Claimed
+                        </button>
+                      )}
                       {!o.paid && (
                         <button className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" onClick={() => markPaid(o)}>Mark Paid</button>
                       )}
