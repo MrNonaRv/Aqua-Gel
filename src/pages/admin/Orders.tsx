@@ -359,8 +359,8 @@ export default function Orders() {
                   <td>
                     <div className="flex gap-2">
                       <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(o)}>Edit</button>
-                      {o.method === 'pickup' && o.status === 'Pending' && (
-                        <button className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" onClick={() => markClaimed(o)}>Claimed</button>
+                      {o.method === 'pickup' && (o.status === 'Pending' || o.status === 'Out for Delivery') && (
+                        <button className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold shadow-xs" onClick={() => markClaimed(o)}>Claimed</button>
                       )}
                       {!o.paid && (
                         <button className="btn btn-sm bg-brand-green-light text-brand-green border border-brand-green/20 hover:bg-green-100 font-semibold" onClick={() => markPaid(o)}>Mark Paid</button>

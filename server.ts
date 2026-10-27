@@ -107,6 +107,48 @@ async function startServer() {
 
   let persistentStore = loadStore();
 
+  const sseClients = new Set<express.Response>();
+
+  app.get('/api/sync/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    res.write(`data: ${JSON.stringify({ type: 'init', data: persistentStore })}\n\n`);
+    sseClients.add(res);
+
+    const keepAlive = setInterval(() => {
+      try {
+        res.write(': keepalive\n\n');
+      } catch (e) {
+        clearInterval(keepAlive);
+        sseClients.delete(res);
+      }
+    }, 15000);
+
+    req.on('close', () => {
+      clearInterval(keepAlive);
+      sseClients.delete(res);
+    });
+  });
+
+  function broadcastChange(type: string, data: any) {
+    const message = `data: ${JSON.stringify({ type, data, time: Date.now() })}\n\n`;
+    for (const client of Array.from(sseClients)) {
+      try {
+        client.write(message);
+      } catch (e) {
+        sseClients.delete(client);
+      }
+    }
+  }
+
+  app.get('/api/store', (req, res) => {
+    res.json({ store: persistentStore });
+  });
+
   app.get('/api/store/:key', (req, res) => {
     const key = req.params.key;
     res.json({ value: persistentStore[key] || null });
@@ -115,9 +157,38 @@ async function startServer() {
   app.post('/api/store/:key', (req, res) => {
     const key = req.params.key;
     const { value } = req.body;
-    persistentStore[key] = value;
+
+    if (key === 'orders' && Array.isArray(value) && Array.isArray(persistentStore.orders)) {
+      const orderMap = new Map();
+      for (const o of persistentStore.orders) {
+        if (o && o.id) orderMap.set(o.id, o);
+      }
+      for (const o of value) {
+        if (o && o.id) {
+          const prev = orderMap.get(o.id);
+          orderMap.set(o.id, prev ? { ...prev, ...o } : o);
+        }
+      }
+      persistentStore.orders = Array.from(orderMap.values()).sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
+    } else if (key === 'customers' && Array.isArray(value) && Array.isArray(persistentStore.customers)) {
+      const custMap = new Map();
+      for (const c of persistentStore.customers) {
+        if (c && c.id) custMap.set(c.id, c);
+      }
+      for (const c of value) {
+        if (c && c.id) {
+          const prev = custMap.get(c.id);
+          custMap.set(c.id, prev ? { ...prev, ...c } : c);
+        }
+      }
+      persistentStore.customers = Array.from(custMap.values());
+    } else {
+      persistentStore[key] = value;
+    }
+
     saveStore(persistentStore);
-    res.json({ success: true });
+    broadcastChange(key, persistentStore[key]);
+    res.json({ success: true, data: persistentStore[key] });
   });
 
   // Vite middleware for development

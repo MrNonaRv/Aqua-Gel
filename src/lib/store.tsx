@@ -117,6 +117,40 @@ import {
   SEED_SETTINGS 
 } from './seeds';
 
+export function cleanData(data: any): any {
+  if (data === undefined) return null;
+  if (data === null || typeof data !== 'object') return data;
+  return JSON.parse(JSON.stringify(data));
+}
+
+export function mergeOrders(incoming: Order[], current: Order[]): Order[] {
+  const map = new Map<string, Order>();
+  for (const o of current) {
+    if (o && o.id) map.set(o.id, o);
+  }
+  for (const o of incoming) {
+    if (o && o.id) {
+      const prev = map.get(o.id);
+      map.set(o.id, prev ? { ...prev, ...o } : o);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => (b.date || 0) - (a.date || 0));
+}
+
+export function mergeCustomers(incoming: Customer[], current: Customer[]): Customer[] {
+  const map = new Map<string, Customer>();
+  for (const c of current) {
+    if (c && c.id) map.set(c.id, c);
+  }
+  for (const c of incoming) {
+    if (c && c.id) {
+      const prev = map.get(c.id);
+      map.set(c.id, prev ? { ...prev, ...c } : c);
+    }
+  }
+  return Array.from(map.values());
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   function getInitialState<T>(key: string, defaultValue: T): T {
     if (typeof window === 'undefined') return defaultValue;
@@ -157,16 +191,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     personnelRef.current = personnel;
     stockLogRef.current = stockLog;
     settingsRef.current = settings;
-    
-    // One-time migration of customers and orders to collections
-    customers.forEach(customer => {
-        const { id, ...data } = customer;
-        safeSetDoc(doc(db, 'customers', id), cleanData(data));
-    });
-    orders.forEach(order => {
-        const { id, ...data } = order;
-        safeSetDoc(doc(db, 'orders', id), cleanData(data));
-    });
   }, [customers, orders, subscriptions, inventory, personnel, stockLog, settings]);
 
   useEffect(() => {
@@ -208,40 +232,112 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('storage', handleStorage);
 
+    // 1. Initial shared database fetch on startup
+    fetch('/api/store')
+      .then(res => res.json())
+      .then(json => {
+        if (json?.store) {
+          const s = json.store;
+          if (s.customers && JSON.stringify(s.customers) !== JSON.stringify(customersRef.current)) {
+            _setCustomers(s.customers);
+            localStorage.setItem('ag_customers', JSON.stringify(s.customers));
+          }
+          if (s.orders && JSON.stringify(s.orders) !== JSON.stringify(ordersRef.current)) {
+            _setOrders(s.orders);
+            localStorage.setItem('ag_orders', JSON.stringify(s.orders));
+          }
+          if (s.subscriptions && JSON.stringify(s.subscriptions) !== JSON.stringify(subscriptionsRef.current)) {
+            _setSubscriptions(s.subscriptions);
+            localStorage.setItem('ag_subscriptions', JSON.stringify(s.subscriptions));
+          }
+          if (s.inventory) {
+            _setInventory(s.inventory);
+            localStorage.setItem('ag_inventory', JSON.stringify(s.inventory));
+          }
+          if (s.personnel) {
+            _setPersonnel(s.personnel);
+            localStorage.setItem('ag_personnel', JSON.stringify(s.personnel));
+          }
+          if (s.stocklog) {
+            _setStockLog(s.stocklog);
+            localStorage.setItem('ag_stocklog', JSON.stringify(s.stocklog));
+          }
+          if (s.settings) {
+            _setSettings(s.settings);
+            localStorage.setItem('ag_settings', JSON.stringify(s.settings));
+          }
+          setLoading(false);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Real-time Cross-Device Server-Sent Events (SSE) listener
+    let sseSource: EventSource | null = null;
+    try {
+      sseSource = new EventSource('/api/sync/events');
+      sseSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (!payload) return;
+          if (payload.type === 'init' && payload.data) {
+            const s = payload.data;
+            if (s.customers?.length) { _setCustomers(s.customers); localStorage.setItem('ag_customers', JSON.stringify(s.customers)); }
+            if (s.orders?.length) { _setOrders(s.orders); localStorage.setItem('ag_orders', JSON.stringify(s.orders)); }
+            if (s.subscriptions) { _setSubscriptions(s.subscriptions); localStorage.setItem('ag_subscriptions', JSON.stringify(s.subscriptions)); }
+            if (s.inventory) { _setInventory(s.inventory); localStorage.setItem('ag_inventory', JSON.stringify(s.inventory)); }
+            if (s.personnel) { _setPersonnel(s.personnel); localStorage.setItem('ag_personnel', JSON.stringify(s.personnel)); }
+            if (s.stocklog) { _setStockLog(s.stocklog); localStorage.setItem('ag_stocklog', JSON.stringify(s.stocklog)); }
+            if (s.settings) { _setSettings(s.settings); localStorage.setItem('ag_settings', JSON.stringify(s.settings)); }
+            setLoading(false);
+          } else if (payload.type && payload.data !== undefined) {
+            switch (payload.type) {
+              case 'customers': _setCustomers(payload.data); localStorage.setItem('ag_customers', JSON.stringify(payload.data)); break;
+              case 'orders': _setOrders(payload.data); localStorage.setItem('ag_orders', JSON.stringify(payload.data)); break;
+              case 'subscriptions': _setSubscriptions(payload.data); localStorage.setItem('ag_subscriptions', JSON.stringify(payload.data)); break;
+              case 'inventory': _setInventory(payload.data); localStorage.setItem('ag_inventory', JSON.stringify(payload.data)); break;
+              case 'personnel': _setPersonnel(payload.data); localStorage.setItem('ag_personnel', JSON.stringify(payload.data)); break;
+              case 'stocklog': _setStockLog(payload.data); localStorage.setItem('ag_stocklog', JSON.stringify(payload.data)); break;
+              case 'settings': _setSettings(payload.data); localStorage.setItem('ag_settings', JSON.stringify(payload.data)); break;
+            }
+          }
+        } catch (e) {}
+      };
+    } catch (e) {}
+
     let lastFirestoreSync = 0;
 
     // Firestore real-time snapshots with auto-initialization and cross-device sync
     const unsubCustomers = onSnapshot(collection(db, 'customers'), 
       (snapshot: QuerySnapshot<DocumentData>) => { 
+        if (snapshot.empty) return;
         const val: Customer[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         lastFirestoreSync = Date.now();
         setLoading(false);
-        if (JSON.stringify(val) !== JSON.stringify(customersRef.current)) {
-          if (val.length === 0 && customersRef.current.length > 0) return;
-          _setCustomers(val); 
-          localStorage.setItem('ag_customers', JSON.stringify(val)); 
-          syncServerBackup('customers', val);
+        const merged = mergeCustomers(val, customersRef.current);
+        if (JSON.stringify(merged) !== JSON.stringify(customersRef.current)) {
+          _setCustomers(merged); 
+          localStorage.setItem('ag_customers', JSON.stringify(merged)); 
+          syncServerBackup('customers', merged);
         }
       },
       (err: any) => { 
-        console.error("Firestore customers sync error:", err);
         setLoading(false);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
     const unsubOrders = onSnapshot(collection(db, 'orders'), 
       (snapshot: QuerySnapshot<DocumentData>) => { 
+        if (snapshot.empty) return;
         const val: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
         lastFirestoreSync = Date.now();
-        if (JSON.stringify(val) !== JSON.stringify(ordersRef.current)) {
-          if (val.length === 0 && ordersRef.current.length > 0) return;
-          _setOrders(val); 
-          localStorage.setItem('ag_orders', JSON.stringify(val)); 
-          syncServerBackup('orders', val);
+        const merged = mergeOrders(val, ordersRef.current);
+        if (JSON.stringify(merged) !== JSON.stringify(ordersRef.current)) {
+          _setOrders(merged); 
+          localStorage.setItem('ag_orders', JSON.stringify(merged)); 
+          syncServerBackup('orders', merged);
         }
       },
       (err: any) => { 
-        console.error("Firestore orders sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
@@ -260,7 +356,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
-        console.error("Firestore subscriptions sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
@@ -279,7 +374,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
-        console.error("Firestore inventory sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
@@ -298,7 +392,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
-        console.error("Firestore personnel sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
@@ -317,7 +410,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
-        console.error("Firestore stocklog sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
@@ -336,19 +428,53 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       (err: any) => { 
-        console.error("Firestore settings sync error:", err);
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
+
+    // 3. Periodic real-time poll fallback across devices
+    const pollInterval = setInterval(() => {
+      fetch('/api/store')
+        .then(res => res.json())
+        .then(json => {
+          if (json?.store) {
+            const s = json.store;
+            if (Array.isArray(s.orders) && s.orders.length > 0) {
+              const merged = mergeOrders(s.orders, ordersRef.current);
+              if (JSON.stringify(merged) !== JSON.stringify(ordersRef.current)) {
+                _setOrders(merged);
+                localStorage.setItem('ag_orders', JSON.stringify(merged));
+              }
+            }
+            if (Array.isArray(s.customers) && s.customers.length > 0) {
+              const merged = mergeCustomers(s.customers, customersRef.current);
+              if (JSON.stringify(merged) !== JSON.stringify(customersRef.current)) {
+                _setCustomers(merged);
+                localStorage.setItem('ag_customers', JSON.stringify(merged));
+              }
+            }
+            if (s.inventory && JSON.stringify(s.inventory) !== JSON.stringify(inventoryRef.current)) {
+              _setInventory(s.inventory);
+              localStorage.setItem('ag_inventory', JSON.stringify(s.inventory));
+            }
+            if (s.settings && JSON.stringify(s.settings) !== JSON.stringify(settingsRef.current)) {
+              _setSettings(s.settings);
+              localStorage.setItem('ag_settings', JSON.stringify(s.settings));
+            }
+          }
+        })
+        .catch(() => {});
+    }, 3000);
 
     return () => {
       unsubCustomers(); unsubOrders(); unsubSubscriptions(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
       window.removeEventListener('storage', handleStorage);
       syncChannelRef.current?.close();
+      sseSource?.close();
+      clearInterval(pollInterval);
     };
   }, []);
 
-  const cleanData = (data: any) => JSON.parse(JSON.stringify(data));
   const syncServerBackup = (key: string, value: any) => {
     fetch(`/api/store/${key}`, {
       method: 'POST',
@@ -377,13 +503,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const safeSetDoc = (docRef: any, data: any) => {
     if (isQuotaExhaustedRef.current) return;
-    setDoc(docRef, data).catch(err => {
-      console.error("Firestore write error:", err);
-      if (err?.code === 'resource-exhausted') {
-        isQuotaExhaustedRef.current = true;
-        setQuotaWarning(true);
-      }
-    });
+    try {
+      setDoc(docRef, cleanData(data)).catch(err => {
+        if (err?.code === 'resource-exhausted') {
+          isQuotaExhaustedRef.current = true;
+          setQuotaWarning(true);
+        }
+      });
+    } catch (e) {}
   };
 
   const setCustomers = (updater: Customer[] | ((prev: Customer[]) => Customer[])) => { 
@@ -391,22 +518,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const c = typeof updater === 'function' ? updater(prev) : updater;
       broadcastAndSave('customers', c);
       safeSetDoc(doc(db, 'store', 'customers'), { value: cleanData(c), updatedAt: Date.now() }); 
-      c.forEach(customer => {
-          const { id, ...data } = customer;
-          safeSetDoc(doc(db, 'customers', id), cleanData(data));
+      
+      const changed = c.filter(item => {
+        const prevItem = prev.find(p => p.id === item.id);
+        return !prevItem || JSON.stringify(cleanData(prevItem)) !== JSON.stringify(cleanData(item));
       });
+      for (const ch of changed) {
+        if (ch?.id) safeSetDoc(doc(db, 'customers', ch.id), cleanData(ch));
+      }
       return c;
     });
   };
+
   const setOrders = (updater: Order[] | ((prev: Order[]) => Order[])) => { 
     _setOrders(prev => {
       const o = typeof updater === 'function' ? updater(prev) : updater;
       broadcastAndSave('orders', o);
       syncServerBackup('orders', o);
-      o.forEach(order => {
-          const { id, ...data } = order;
-          safeSetDoc(doc(db, 'orders', id), cleanData(data));
+
+      const changed = o.filter(item => {
+        const prevItem = prev.find(p => p.id === item.id);
+        return !prevItem || JSON.stringify(cleanData(prevItem)) !== JSON.stringify(cleanData(item));
       });
+      for (const ch of changed) {
+        if (ch?.id) safeSetDoc(doc(db, 'orders', ch.id), cleanData(ch));
+      }
       return o;
     });
   };
