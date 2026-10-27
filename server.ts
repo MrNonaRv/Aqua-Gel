@@ -116,6 +116,7 @@ async function startServer() {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
+    persistentStore = loadStore();
     res.write(`data: ${JSON.stringify({ type: 'init', data: persistentStore })}\n\n`);
     sseClients.add(res);
 
@@ -146,21 +147,24 @@ async function startServer() {
   }
 
   app.get('/api/store', (req, res) => {
+    persistentStore = loadStore();
     res.json({ store: persistentStore });
   });
 
   app.get('/api/store/:key', (req, res) => {
     const key = req.params.key;
+    persistentStore = loadStore();
     res.json({ value: persistentStore[key] || null });
   });
 
   app.post('/api/store/:key', (req, res) => {
     const key = req.params.key;
     const { value } = req.body;
+    persistentStore = loadStore();
 
-    if (key === 'orders' && Array.isArray(value) && Array.isArray(persistentStore.orders)) {
+    if (key === 'orders' && Array.isArray(value)) {
       const orderMap = new Map();
-      for (const o of persistentStore.orders) {
+      for (const o of (persistentStore.orders || [])) {
         if (o && o.id) orderMap.set(o.id, o);
       }
       for (const o of value) {
@@ -170,9 +174,9 @@ async function startServer() {
         }
       }
       persistentStore.orders = Array.from(orderMap.values()).sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
-    } else if (key === 'customers' && Array.isArray(value) && Array.isArray(persistentStore.customers)) {
+    } else if (key === 'customers' && Array.isArray(value)) {
       const custMap = new Map();
-      for (const c of persistentStore.customers) {
+      for (const c of (persistentStore.customers || [])) {
         if (c && c.id) custMap.set(c.id, c);
       }
       for (const c of value) {

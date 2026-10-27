@@ -325,6 +325,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
       }
     );
+    const unsubStoreCustomers = onSnapshot(doc(db, 'store', 'customers'),
+      (d) => {
+        if (d.exists() && Array.isArray(d.data()?.value) && d.data().value.length > 0) {
+          const val: Customer[] = d.data().value;
+          lastFirestoreSync = Date.now();
+          setLoading(false);
+          const merged = mergeCustomers(val, customersRef.current);
+          if (JSON.stringify(merged) !== JSON.stringify(customersRef.current)) {
+            _setCustomers(merged);
+            localStorage.setItem('ag_customers', JSON.stringify(merged));
+            syncServerBackup('customers', merged);
+          }
+        }
+      },
+      (err: any) => {
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true);
+      }
+    );
     const unsubOrders = onSnapshot(collection(db, 'orders'), 
       (snapshot: QuerySnapshot<DocumentData>) => { 
         if (snapshot.empty) return;
@@ -339,6 +357,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       (err: any) => { 
         if (err?.code === 'resource-exhausted') setQuotaWarning(true); 
+      }
+    );
+    const unsubStoreOrders = onSnapshot(doc(db, 'store', 'orders'),
+      (d) => {
+        if (d.exists() && Array.isArray(d.data()?.value) && d.data().value.length > 0) {
+          const val: Order[] = d.data().value;
+          lastFirestoreSync = Date.now();
+          const merged = mergeOrders(val, ordersRef.current);
+          if (JSON.stringify(merged) !== JSON.stringify(ordersRef.current)) {
+            _setOrders(merged);
+            localStorage.setItem('ag_orders', JSON.stringify(merged));
+            syncServerBackup('orders', merged);
+          }
+        }
+      },
+      (err: any) => {
+        if (err?.code === 'resource-exhausted') setQuotaWarning(true);
       }
     );
     const unsubSubscriptions = onSnapshot(doc(db, 'store', 'subscriptions'), 
@@ -467,7 +502,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 3000);
 
     return () => {
-      unsubCustomers(); unsubOrders(); unsubSubscriptions(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
+      unsubCustomers(); unsubStoreCustomers(); unsubOrders(); unsubStoreOrders(); unsubSubscriptions(); unsubInventory(); unsubPersonnel(); unsubStockLog(); unsubSettings();
       window.removeEventListener('storage', handleStorage);
       syncChannelRef.current?.close();
       sseSource?.close();
@@ -535,6 +570,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const o = typeof updater === 'function' ? updater(prev) : updater;
       broadcastAndSave('orders', o);
       syncServerBackup('orders', o);
+      safeSetDoc(doc(db, 'store', 'orders'), { value: cleanData(o), updatedAt: Date.now() });
 
       const changed = o.filter(item => {
         const prevItem = prev.find(p => p.id === item.id);
