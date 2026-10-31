@@ -2,6 +2,7 @@ import { useStore } from '../../lib/store';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
+import { formatCurrency } from '../../lib/format';
 
 export default function Dashboard() {
   const { orders, customers, inventory, setCustomers, setOrders, setSubscriptions, setInventory, setPersonnel, setStockLog, setSettings } = useStore();
@@ -78,7 +79,7 @@ export default function Dashboard() {
         <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="bg-white p-5 rounded-2xl border border-brand-border hover:shadow-md transition-shadow relative overflow-hidden group">
           <div className="relative z-10">
             <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Today's Income</div>
-            <div className="font-heading text-4xl font-bold text-brand-green mb-1 drop-shadow-sm">₱{todayIncome.toLocaleString()}</div>
+            <div className="font-heading text-4xl font-bold text-brand-green mb-1 drop-shadow-sm">₱{formatCurrency(todayIncome)}</div>
             <div className="text-xs text-brand-gray font-medium">{todayOrders.length} orders today</div>
           </div>
           <div className="absolute inset-x-0 bottom-0 h-24 opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none">
@@ -96,7 +97,7 @@ export default function Dashboard() {
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="bg-white p-5 rounded-2xl border border-brand-border hover:shadow-md transition-shadow">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Total Unpaid</div>
-          <div className="font-heading text-4xl font-bold text-brand-red mb-1 drop-shadow-sm">₱{totalUnpaid.toLocaleString()}</div>
+          <div className="font-heading text-4xl font-bold text-brand-red mb-1 drop-shadow-sm">₱{formatCurrency(totalUnpaid)}</div>
           <div className="text-xs text-brand-gray font-medium">{unpaidCustomers.length} customers</div>
         </motion.div>
         <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="bg-white p-5 rounded-2xl border border-brand-border hover:shadow-md transition-shadow">
@@ -134,7 +135,7 @@ export default function Dashboard() {
                       </span>
                     </td>
                     <td>
-                      <div className="font-semibold text-brand-dark">₱{o.total}</div>
+                      <div className="font-semibold text-brand-dark">₱{formatCurrency(o.total)}</div>
                       <div className="mt-1">
                         <span className={`badge text-[10px] ${o.paid ? 'badge-paid' : 'badge-unpaid'}`}>
                           {o.paid ? 'Paid' : 'Unpaid'}
@@ -196,11 +197,11 @@ export default function Dashboard() {
             <div className="flex gap-8">
               <div>
                 <div className="text-xs text-brand-gray mb-1">Slim Gallon</div>
-                <div className="font-bold text-xl text-brand-blue">₱{inventory.priceSlim}</div>
+                <div className="font-bold text-xl text-brand-blue">₱{formatCurrency(inventory.priceSlim)}</div>
               </div>
               <div>
                 <div className="text-xs text-brand-gray mb-1">Round Gallon</div>
-                <div className="font-bold text-xl text-brand-teal">₱{inventory.priceRound}</div>
+                <div className="font-bold text-xl text-brand-teal">₱{formatCurrency(inventory.priceRound)}</div>
               </div>
             </div>
           </div>
@@ -231,7 +232,7 @@ export default function Dashboard() {
                   </td>
                   <td className="text-brand-gray">{c.phone || '—'}</td>
                   <td className="text-brand-gray text-sm">{c.address}</td>
-                  <td className="font-bold text-brand-red">₱{c.unpaid}</td>
+                  <td className="font-bold text-brand-red">₱{formatCurrency(c.unpaid)}</td>
                   <td><span className="badge badge-unpaid">Unpaid</span></td>
                 </tr>
               )) : (

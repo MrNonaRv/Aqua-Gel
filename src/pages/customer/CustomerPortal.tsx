@@ -6,6 +6,7 @@ import { ShoppingCart, Package, User, Power, MapPin, Phone, Menu, X, CreditCard 
 import { motion, AnimatePresence } from 'motion/react';
 import { SlimGallonIcon, RoundGallonIcon } from '../../components/icons/Gallons';
 import { toast } from 'sonner';
+import { formatCurrency } from '../../lib/format';
 
 export default function CustomerPortal() {
   useCustomerNotifications();

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore, Customer } from '../../lib/store';
 import { Search, MapPin, Phone, User as UserIcon } from 'lucide-react';
+import { formatCurrency } from '../../lib/format';
 
 export default function Customers() {
   const { customers, setCustomers, orders } = useStore();
@@ -94,7 +95,7 @@ export default function Customers() {
                   <td className="text-brand-gray">@{c.username}</td>
                   <td>{c.phone || '—'}</td>
                   <td className="text-brand-gray text-xs max-w-[200px] truncate" title={c.address}>{c.address}</td>
-                  <td><strong className={c.unpaid > 0 ? 'text-brand-red' : 'text-brand-green'}>₱{c.unpaid}</strong></td>
+                  <td><strong className={c.unpaid > 0 ? 'text-brand-red' : 'text-brand-green'}>₱{formatCurrency(c.unpaid)}</strong></td>
                   <td>
                     <span className={`badge ${c.isLoyal ? 'badge-loyal' : 'badge-delivered'}`}>
                       {c.isLoyal ? 'Regular' : 'Standard'}
@@ -149,12 +150,12 @@ export default function Customers() {
                   <div className="grid grid-cols-2 gap-4 mb-5">
                     <div className="bg-brand-gray-light rounded-xl p-4">
                       <div className="text-xs text-brand-gray mb-1">Total Spent</div>
-                      <div className="font-heading text-2xl font-bold text-brand-green">₱{totalSpent}</div>
+                      <div className="font-heading text-2xl font-bold text-brand-green">₱{formatCurrency(totalSpent)}</div>
                     </div>
                     <div className="bg-brand-gray-light rounded-xl p-4">
                       <div className="text-xs text-brand-gray mb-1">Unpaid Balance</div>
                       <div className={`font-heading text-2xl font-bold ${viewCust.unpaid > 0 ? 'text-brand-red' : 'text-brand-dark'}`}>
-                        ₱{viewCust.unpaid}
+                        ₱{formatCurrency(viewCust.unpaid)}
                       </div>
                     </div>
                   </div>
@@ -216,7 +217,7 @@ export default function Customers() {
                           <div className="text-xs text-brand-gray mt-0.5">{new Date(o.date).toLocaleDateString('en-PH')}</div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold mb-0.5">₱{o.total}</div>
+                          <div className="font-bold mb-0.5">₱{formatCurrency(o.total)}</div>
                           <span className={`badge text-[10px] ${o.paid ? 'badge-paid' : 'badge-unpaid'} mr-1`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
                           {o.paid && o.paidDate && (
                             <div className="text-[10px] text-brand-green font-semibold mt-0.5">

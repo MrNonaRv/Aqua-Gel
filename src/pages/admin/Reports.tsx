@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../lib/store';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatCurrency } from '../../lib/format';
 
 export default function Reports() {
   const { orders } = useStore();
@@ -142,7 +143,7 @@ export default function Reports() {
       {(period === 'daily' || period === 'weekly' || subFilter) && (
         <div className="bg-gradient-to-r from-brand-blue to-brand-teal text-white p-6 rounded-2xl mb-8 shadow-md print:bg-none print:bg-white print:border print:border-brand-border print:text-brand-dark">
           <div className="text-white/80 print:text-brand-gray font-medium mb-1 uppercase tracking-wider text-sm">Total Income {subFilter ? subFilter.name : periodLabels[period]}</div>
-          <div className="font-heading text-4xl font-bold">₱{income.toLocaleString()}</div>
+          <div className="font-heading text-4xl font-bold">₱{formatCurrency(income)}</div>
         </div>
       )}
 
@@ -173,12 +174,12 @@ export default function Reports() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 print:grid-cols-4">
         <div className="card !mb-0 p-6 print:border print:shadow-none">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Total Income</div>
-          <div className="font-heading text-3xl lg:text-4xl font-bold text-brand-green mb-1">₱{income.toLocaleString()}</div>
+          <div className="font-heading text-3xl lg:text-4xl font-bold text-brand-green mb-1">₱{formatCurrency(income)}</div>
           <div className="text-sm text-brand-gray font-medium">{paid.length} paid orders</div>
         </div>
         <div className="card !mb-0 p-6 print:border print:shadow-none">
           <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2">Outstanding</div>
-          <div className="font-heading text-3xl lg:text-4xl font-bold text-brand-red mb-1">₱{outstanding.toLocaleString()}</div>
+          <div className="font-heading text-3xl lg:text-4xl font-bold text-brand-red mb-1">₱{formatCurrency(outstanding)}</div>
           <div className="text-sm text-brand-gray font-medium">{unpaid.length} unpaid orders</div>
         </div>
         <div className="card !mb-0 p-6 print:border print:shadow-none">
@@ -203,11 +204,11 @@ export default function Reports() {
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
               <XAxis dataKey="name" tickLine={false} axisLine={false} dy={10} tick={{ fill: '#6B7280' }} />
-              <YAxis tickLine={false} axisLine={false} tickFormatter={v => `₱${v}`} dx={-10} tick={{ fill: '#6B7280' }} />
+              <YAxis tickLine={false} axisLine={false} tickFormatter={v => `₱${formatCurrency(v)}`} dx={-10} tick={{ fill: '#6B7280' }} />
               <Tooltip 
                 cursor={{ fill: '#F3F4F6' }}
                 contentStyle={{ borderRadius: '12px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Total Income']}
+                formatter={(value: number) => [`₱${formatCurrency(value)}`, 'Total Income']}
               />
               <Bar 
                 dataKey="total" 
@@ -260,7 +261,7 @@ export default function Reports() {
                   <td>{o.type === 'slim' ? '🔵 Slim' : '🟢 Round'}</td>
                   <td>{o.qty}</td>
                   <td>{o.method === 'delivery' ? '🚚 Delivery' : '🏪 Pick-up'}</td>
-                  <td className="font-bold">₱{o.total}</td>
+                  <td className="font-bold">₱{formatCurrency(o.total)}</td>
                   <td><span className={`badge ${o.paid ? 'badge-paid' : 'badge-unpaid'}`}>{o.paid ? 'Paid' : 'Unpaid'}</span></td>
                 </tr>
               )) : (

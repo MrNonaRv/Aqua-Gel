@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStore, Order, Customer } from '../../lib/store';
 import { notifyStatusChange } from '../../lib/notifications';
 import { toast } from 'sonner';
+import { formatCurrency } from '../../lib/format';
 
 export default function Orders() {
   const { orders, setOrders, personnel, updateCustomerBalance, customers, setCustomers, inventory, setInventory, subscriptions, setSubscriptions } = useStore();
@@ -336,7 +337,7 @@ export default function Orders() {
                   <td>{o.type === 'slim' ? '🔵 Slim' : '🟢 Round'}</td>
                   <td>{o.qty}</td>
                   <td>{o.method === 'delivery' ? '🚚 Delivery' : '🏪 Pick-up'}</td>
-                  <td className="font-bold text-brand-dark">₱{o.total}</td>
+                  <td className="font-bold text-brand-dark">₱{formatCurrency(o.total)}</td>
                   <td>
                     <div className="flex flex-col gap-0.5">
                       <div>
@@ -679,7 +680,7 @@ export default function Orders() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Total</label>
                 <div className="w-full rounded-full border-[2px] border-slate-300 py-3 text-center text-lg font-black text-slate-850 bg-slate-50 shadow-inner">
-                  ₱{walkInQty * getUnitPrice(walkInType)}
+                  ₱{formatCurrency(walkInQty * getUnitPrice(walkInType))}
                 </div>
               </div>
 

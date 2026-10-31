@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../../lib/store';
 import { notifyStatusChange } from '../../lib/notifications';
 import { Mailbox, Truck, CheckCircle2, User, X } from 'lucide-react';
+import { formatCurrency } from '../../lib/format';
 
 export default function Delivery() {
   const { orders, setOrders, personnel, setPersonnel } = useStore();
@@ -89,7 +90,7 @@ export default function Delivery() {
                     <span className={`badge ${o.type === 'slim' ? 'badge-delivery' : 'badge-delivered'} text-[10px]`}>
                       {o.type === 'slim' ? '🔵 Slim' : '🟢 Round'} ×{o.qty}
                     </span>
-                    <span className="text-xs text-brand-gray font-medium">₱{o.total}</span>
+                    <span className="text-xs text-brand-gray font-medium">₱{formatCurrency(o.total)}</span>
                     <span className={`badge ${o.paid ? 'badge-paid' : 'badge-unpaid'} text-[10px]`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
                   </div>
 

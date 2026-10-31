@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../../lib/store';
 import { Package, Plus } from 'lucide-react';
+import { formatCurrency } from '../../lib/format';
 
 export default function Inventory() {
   const { inventory, setInventory, stockLog, setStockLog } = useStore();
@@ -98,7 +99,7 @@ export default function Inventory() {
             <span className="text-3xl">🔵</span>
             <div>
               <div className="font-heading text-xl font-bold">Slim Gallons</div>
-              <div className="text-sm text-brand-gray">₱{inventory.priceSlim} per gallon</div>
+              <div className="text-sm text-brand-gray">₱{formatCurrency(inventory.priceSlim)} per gallon</div>
             </div>
           </div>
           
@@ -138,7 +139,7 @@ export default function Inventory() {
             <span className="text-3xl">🟢</span>
             <div>
               <div className="font-heading text-xl font-bold">Round Gallons</div>
-              <div className="text-sm text-brand-gray">₱{inventory.priceRound} per gallon</div>
+              <div className="text-sm text-brand-gray">₱{formatCurrency(inventory.priceRound)} per gallon</div>
             </div>
           </div>
           
@@ -216,7 +217,7 @@ export default function Inventory() {
                     <button 
                       key={pct}
                       className="px-2.5 py-1 bg-white text-brand-dark text-xs rounded-lg border border-brand-border hover:bg-slate-50 transition-colors font-medium shadow-sm"
-                      onClick={() => setSlimDiscount((parseFloat(slimPrice) * (1 - pct/100)).toFixed(2))}
+                      onClick={() => setSlimDiscount(formatCurrency(parseFloat(slimPrice) * (1 - pct/100)))}
                     >
                       {pct}% Off
                     </button>
@@ -251,7 +252,7 @@ export default function Inventory() {
                     <button 
                       key={pct}
                       className="px-2.5 py-1 bg-white text-brand-dark text-xs rounded-lg border border-brand-border hover:bg-slate-50 transition-colors font-medium shadow-sm"
-                      onClick={() => setRoundDiscount((parseFloat(roundPrice) * (1 - pct/100)).toFixed(2))}
+                      onClick={() => setRoundDiscount(formatCurrency(parseFloat(roundPrice) * (1 - pct/100)))}
                     >
                       {pct}% Off
                     </button>
