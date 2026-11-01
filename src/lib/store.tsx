@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { doc, onSnapshot, setDoc, setLogLevel, collection, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { db } from './firebase';
+import { roundToTwo } from './format';
 
 // Suppress excessive console debug logs from Firestore internal backoff
 try {
@@ -117,10 +118,23 @@ import {
   SEED_SETTINGS 
 } from './seeds';
 
-export function cleanData(data: any): any {
+export function sanitizeData(data: any): any {
   if (data === undefined) return null;
-  if (data === null || typeof data !== 'object') return data;
-  return JSON.parse(JSON.stringify(data));
+  if (data === null || typeof data !== 'object') {
+    return typeof data === 'number' ? roundToTwo(data) : data;
+  }
+  if (Array.isArray(data)) return data.map(sanitizeData);
+  const sanitized: any = {};
+  for (const key in data) {
+    if (data[key] !== undefined) {
+      sanitized[key] = sanitizeData(data[key]);
+    }
+  }
+  return sanitized;
+}
+
+export function cleanData(data: any): any {
+  return sanitizeData(data);
 }
 
 export function mergeOrders(incoming: Order[], current: Order[]): Order[] {
@@ -310,7 +324,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubCustomers = onSnapshot(collection(db, 'customers'), 
       (snapshot: QuerySnapshot<DocumentData>) => { 
         if (snapshot.empty) return;
-        const val: Customer[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        const val: Customer[] = sanitizeData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
         lastFirestoreSync = Date.now();
         setLoading(false);
         const merged = mergeCustomers(val, customersRef.current);
@@ -328,7 +342,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubStoreCustomers = onSnapshot(doc(db, 'store', 'customers'),
       (d) => {
         if (d.exists() && Array.isArray(d.data()?.value) && d.data().value.length > 0) {
-          const val: Customer[] = d.data().value;
+          const val: Customer[] = sanitizeData(d.data().value);
           lastFirestoreSync = Date.now();
           setLoading(false);
           const merged = mergeCustomers(val, customersRef.current);
@@ -346,7 +360,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubOrders = onSnapshot(collection(db, 'orders'), 
       (snapshot: QuerySnapshot<DocumentData>) => { 
         if (snapshot.empty) return;
-        const val: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        const val: Order[] = sanitizeData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
         lastFirestoreSync = Date.now();
         const merged = mergeOrders(val, ordersRef.current);
         if (JSON.stringify(merged) !== JSON.stringify(ordersRef.current)) {
@@ -362,7 +376,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubStoreOrders = onSnapshot(doc(db, 'store', 'orders'),
       (d) => {
         if (d.exists() && Array.isArray(d.data()?.value) && d.data().value.length > 0) {
-          const val: Order[] = d.data().value;
+          const val: Order[] = sanitizeData(d.data().value);
           lastFirestoreSync = Date.now();
           const merged = mergeOrders(val, ordersRef.current);
           if (JSON.stringify(merged) !== JSON.stringify(ordersRef.current)) {
@@ -379,7 +393,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubSubscriptions = onSnapshot(doc(db, 'store', 'subscriptions'), 
       (d) => { 
         if (d.exists() && d.data()?.value) { 
-          const val = d.data().value;
+          const val = sanitizeData(d.data().value);
           lastFirestoreSync = Date.now();
           if (JSON.stringify(val) !== JSON.stringify(subscriptionsRef.current)) {
             _setSubscriptions(val); 
@@ -397,7 +411,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubInventory = onSnapshot(doc(db, 'store', 'inventory'), 
       (d) => { 
         if (d.exists() && d.data()?.value) { 
-          const val = d.data().value;
+          const val = sanitizeData(d.data().value);
           lastFirestoreSync = Date.now();
           if (JSON.stringify(val) !== JSON.stringify(inventoryRef.current)) {
             _setInventory(val); 
@@ -415,7 +429,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubPersonnel = onSnapshot(doc(db, 'store', 'personnel'), 
       (d) => { 
         if (d.exists() && d.data()?.value) { 
-          const val = d.data().value;
+          const val = sanitizeData(d.data().value);
           lastFirestoreSync = Date.now();
           if (JSON.stringify(val) !== JSON.stringify(personnelRef.current)) {
             _setPersonnel(val); 
@@ -433,7 +447,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubStockLog = onSnapshot(doc(db, 'store', 'stocklog'), 
       (d) => { 
         if (d.exists() && d.data()?.value) { 
-          const val = d.data().value;
+          const val = sanitizeData(d.data().value);
           lastFirestoreSync = Date.now();
           if (JSON.stringify(val) !== JSON.stringify(stockLogRef.current)) {
             _setStockLog(val); 
@@ -451,7 +465,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubSettings = onSnapshot(doc(db, 'store', 'settings'), 
       (d) => { 
         if (d.exists() && d.data()?.value) { 
-          const val = d.data().value;
+          const val = sanitizeData(d.data().value);
           lastFirestoreSync = Date.now();
           if (JSON.stringify(val) !== JSON.stringify(settingsRef.current)) {
             _setSettings(val); 
