@@ -244,19 +244,6 @@ export default function Customers() {
                       <button className="btn btn-primary whitespace-nowrap" onClick={handleRecordPayment}>Apply Payment</button>
                     </div>
 
-                    <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-brand-border text-brand-blue focus:ring-brand-blue" 
-                        checked={viewCust.isLoyal}
-                        onChange={e => {
-                          const updated = { ...viewCust, isLoyal: e.target.checked };
-                          setCustomers(customers.map(c => c.id === viewCust.id ? updated : c));
-                          setViewCust(updated);
-                        }}
-                      />
-                      Tag as Loyal / Regular Customer (2% Discount)
-                    </label>
                   </div>
                 </>
               );
