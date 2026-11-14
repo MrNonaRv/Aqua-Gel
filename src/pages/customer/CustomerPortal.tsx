@@ -468,6 +468,20 @@ export default function CustomerPortal() {
                 <p className="text-brand-gray text-base sm:text-lg">Select your water type, quantity, and delivery method</p>
               </div>
 
+              {customer?.isLoyal && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 mb-8 flex items-center gap-4 shadow-sm"
+                >
+                  <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center text-2xl shrink-0">⭐</div>
+                  <div>
+                    <div className="font-bold text-amber-900 text-base mb-0.5">Loyal Customer Status Active</div>
+                    <div className="text-sm text-amber-700">You automatically receive a 2% discount on all orders! ({customer.totalGallons} / 50+ gallons delivered)</div>
+                  </div>
+                </motion.div>
+              )}
+
               {customer && customer.unpaid > 0 && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -779,8 +793,14 @@ export default function CustomerPortal() {
               <div className="bg-[#f4f7fb] rounded-2xl p-4 sm:p-6 mb-8 border border-brand-border shadow-inner">
                   <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>{selectedType === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {qty}</span>
-                    <span className="font-extrabold text-brand-dark">₱{total}</span>
+                    <span className="font-extrabold text-brand-dark">₱{formatCurrency(rawTotal)}</span>
                   </div>
+                  {customer?.isLoyal && (
+                    <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-amber-700 mb-2.5 bg-amber-50 p-2.5 sm:p-3 rounded-xl border border-amber-200 shadow-xs">
+                      <span>⭐ Loyal Customer Discount (2%)</span>
+                      <span className="font-extrabold">-₱{formatCurrency(discount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-brand-gray mb-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-brand-border/50 shadow-xs">
                     <span>Method</span>
                     <span className="font-extrabold text-brand-dark">{method === 'delivery' ? '🚚 Delivery' : '🏪 Pick-up'}</span>
@@ -793,7 +813,7 @@ export default function CustomerPortal() {
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-brand-border px-1 sm:px-2">
                     <span className="font-heading font-bold text-base sm:text-xl text-brand-dark">Total Amount</span>
-                    <span className="font-heading font-black text-2xl sm:text-3xl text-[#0a6ed1]">₱{total}</span>
+                    <span className="font-heading font-black text-2xl sm:text-3xl text-[#0a6ed1]">₱{formatCurrency(total)}</span>
                   </div>
                 </div>
 
