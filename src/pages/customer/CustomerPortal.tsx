@@ -28,6 +28,20 @@ export default function CustomerPortal() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const customer = customers.find(c => c.id === session?.id);
+  const [backendLoyalty, setBackendLoyalty] = useState<{ isLoyal: boolean; discountPercent: string; totalGallons: number } | null>(null);
+
+  useEffect(() => {
+    if (session?.id) {
+      fetch(`/api/customer/loyalty/${session.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && !data.error) {
+            setBackendLoyalty(data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [session?.id, customers, orders]);
 
   // Order State
   const [selectedType, setSelectedType] = useState<'slim' | 'round'>('slim');
@@ -98,7 +112,8 @@ export default function CustomerPortal() {
 
   const unitPrice = getUnitPrice(selectedType);
   const rawTotal = unitPrice * qty;
-  const discount = customer?.isLoyal ? rawTotal * 0.02 : 0;
+  const isLoyal = backendLoyalty?.isLoyal ?? customer?.isLoyal ?? false;
+  const discount = isLoyal ? rawTotal * 0.02 : 0;
   const total = rawTotal - discount;
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -468,7 +483,7 @@ export default function CustomerPortal() {
                 <p className="text-brand-gray text-base sm:text-lg">Select your water type, quantity, and delivery method</p>
               </div>
 
-              {customer?.isLoyal && (
+              {isLoyal && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -476,8 +491,8 @@ export default function CustomerPortal() {
                 >
                   <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center text-2xl shrink-0">⭐</div>
                   <div>
-                    <div className="font-bold text-amber-900 text-base mb-0.5">Loyal Customer Status Active</div>
-                    <div className="text-sm text-amber-700">You automatically receive a 2% discount on all orders! ({customer.totalGallons} / 50+ gallons delivered)</div>
+                    <div className="font-bold text-amber-900 text-base mb-0.5">Loyal Customer Status Active: 2% Discount Applied</div>
+                    <div className="text-sm text-amber-700">Your admin-granted loyalty status is verified. A 2% discount is automatically applied to all your orders! ({backendLoyalty?.totalGallons ?? customer?.totalGallons ?? 0} gallons delivered)</div>
                   </div>
                 </motion.div>
               )}
@@ -795,7 +810,7 @@ export default function CustomerPortal() {
                     <span>{selectedType === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {qty}</span>
                     <span className="font-extrabold text-brand-dark">₱{formatCurrency(rawTotal)}</span>
                   </div>
-                  {customer?.isLoyal && (
+                  {isLoyal && (
                     <div className="flex justify-between items-center text-xs sm:text-sm font-semibold text-amber-700 mb-2.5 bg-amber-50 p-2.5 sm:p-3 rounded-xl border border-amber-200 shadow-xs">
                       <span>⭐ Loyal Customer Discount (2%)</span>
                       <span className="font-extrabold">-₱{formatCurrency(discount)}</span>

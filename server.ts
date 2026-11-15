@@ -195,6 +195,35 @@ async function startServer() {
     res.json({ success: true, data: persistentStore[key] });
   });
 
+  // Customer Loyalty API Endpoint
+  app.get('/api/customer/loyalty/:customerId', (req, res) => {
+    const customerId = req.params.customerId;
+    persistentStore = loadStore();
+    const customers = persistentStore.customers || [];
+    const orders = persistentStore.orders || [];
+    
+    const customer = customers.find((c: any) => c.id === customerId);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const deliveredQty = orders
+      .filter((o: any) => o.customerId === customerId && o.status === 'Delivered')
+      .reduce((sum: number, o: any) => sum + (o.qty || 0), 0);
+
+    const isLoyal = customer.isLoyal || deliveredQty >= 50;
+
+    res.json({
+      customerId: customer.id,
+      name: customer.name,
+      isLoyal,
+      discountRate: 0.02,
+      discountPercent: '2%',
+      totalGallons: deliveredQty,
+      unpaid: customer.unpaid || 0
+    });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
