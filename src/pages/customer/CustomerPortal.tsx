@@ -408,12 +408,10 @@ export default function CustomerPortal() {
       return;
     }
 
-    // Get current unit price and loyalty discount
+    // Get current unit price
     const currentPrice = getUnitPrice(reactivateModalOrder.type);
     const subtotal = reactivateModalOrder.qty * currentPrice;
-    const isLoyal = customer?.isLoyal || false;
-    const loyaltyDiscount = isLoyal ? subtotal * 0.02 : 0;
-    const newTotal = Number(Math.max(0, subtotal - loyaltyDiscount).toFixed(2));
+    const newTotal = Number(subtotal.toFixed(2));
 
     const newOrder: Order = {
       id: 'o' + Date.now(),
@@ -425,9 +423,6 @@ export default function CustomerPortal() {
       paymentMethod: reactivateModalOrder.paymentMethod || 'cash',
       status: 'Pending',
       subtotal: Number(subtotal.toFixed(2)),
-      discountType: isLoyal ? 'percentage' : undefined,
-      discountValue: isLoyal ? 2 : undefined,
-      discountAmount: isLoyal ? Number(loyaltyDiscount.toFixed(2)) : undefined,
       total: newTotal,
       paid: false,
       date: Date.now(),
@@ -1442,7 +1437,7 @@ export default function CustomerPortal() {
                   <p className="text-xs sm:text-sm text-brand-gray leading-relaxed mb-4">
                     Aqua Gel Water Station is committed to delivering pure, crystal-clear, safe, and mineral-balanced drinking water to households and businesses. Our modern multi-barrier filtration system combines sediment filters, carbon absorption, reverse osmosis, and ultraviolet sterilization to ensure the highest health and safety standards.
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                     <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
                       <div className="text-2xl mb-1">🔬</div>
                       <div className="font-bold text-xs text-brand-dark">21-Stage Purification</div>
@@ -1452,11 +1447,6 @@ export default function CustomerPortal() {
                       <div className="text-2xl mb-1">🧼</div>
                       <div className="font-bold text-xs text-brand-dark">Sterile Sanitization</div>
                       <div className="text-[10px] text-brand-gray mt-0.5">High-pressure sanitized & sealed</div>
-                    </div>
-                    <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
-                      <div className="text-2xl mb-1">⭐</div>
-                      <div className="font-bold text-xs text-brand-dark">Loyalty Perks</div>
-                      <div className="text-[10px] text-brand-gray mt-0.5">2% lifetime discount after 50 gals</div>
                     </div>
                   </div>
                 </div>
@@ -1714,7 +1704,7 @@ export default function CustomerPortal() {
                 <p className="text-xs sm:text-sm text-brand-gray leading-relaxed mb-4">
                   Aqua Gel Water Station is committed to delivering pure, crystal-clear, safe, and mineral-balanced drinking water to households and businesses. Our modern multi-barrier filtration system combines sediment filters, carbon absorption, reverse osmosis, and ultraviolet sterilization to ensure the highest health and safety standards.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
                     <div className="text-2xl mb-1">🔬</div>
                     <div className="font-bold text-xs text-brand-dark">21-Stage Purification</div>
@@ -1724,11 +1714,6 @@ export default function CustomerPortal() {
                     <div className="text-2xl mb-1">🧼</div>
                     <div className="font-bold text-xs text-brand-dark">Sterile Sanitization</div>
                     <div className="text-[10px] text-brand-gray mt-0.5">High-pressure sanitized & sealed</div>
-                  </div>
-                  <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
-                    <div className="text-2xl mb-1">⭐</div>
-                    <div className="font-bold text-xs text-brand-dark">Loyalty Perks</div>
-                    <div className="text-[10px] text-brand-gray mt-0.5">2% lifetime discount after 50 gals</div>
                   </div>
                 </div>
               </div>
@@ -1805,9 +1790,8 @@ export default function CustomerPortal() {
               <span>Estimated Total:</span>
               <span className="text-brand-blue">
                 ₱{formatCurrency(
-                  reactivateModalOrder.qty * getUnitPrice(reactivateModalOrder.type) * (customer?.isLoyal ? 0.98 : 1)
+                  reactivateModalOrder.qty * getUnitPrice(reactivateModalOrder.type)
                 )}
-                {customer?.isLoyal && <span className="text-[10px] text-brand-green ml-1 font-semibold">(2% Loyal Discount)</span>}
               </span>
             </div>
           </div>
