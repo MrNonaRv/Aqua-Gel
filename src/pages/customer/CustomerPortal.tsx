@@ -38,6 +38,7 @@ export default function CustomerPortal() {
 
   // Reactivation Modal State
   const [reactivateModalOrder, setReactivateModalOrder] = useState<Order | null>(null);
+  const [reactivateModalSub, setReactivateModalSub] = useState<any | null>(null);
 
   const customer = customers.find(c => c.id === session?.id);
 
@@ -462,6 +463,20 @@ export default function CustomerPortal() {
     setReactivateModalOrder(null);
     setTab('order');
     toast.info('Order details loaded into order form for your review.');
+  };
+
+  const handleInitiateReactivateSub = (sub: any) => {
+    setReactivateModalSub(sub);
+  };
+
+  const handleConfirmReactivateSub = () => {
+    if (!reactivateModalSub) return;
+    const nextDate = Date.now() + ((reactivateModalSub.intervalDays || 7) * 24 * 60 * 60 * 1000);
+    setSubscriptions(subscriptions.map(s => s.id === reactivateModalSub.id ? { ...s, active: true, nextDeliveryDate: nextDate } : s));
+    setReactivateModalSub(null);
+    toast.success('Subscription Reactivated!', {
+      description: 'Your recurring deliveries have resumed.'
+    });
   };
 
   const myOrders = orders.filter(o => o.customerId === session?.id).sort((a,b) => b.date - a.date);
@@ -928,16 +943,21 @@ export default function CustomerPortal() {
               <p className="text-brand-gray text-lg">Track your current and past orders</p>
             </div>
 
-            {subscriptions.filter(s => s.customerId === session?.id && s.active).length > 0 && (
+            {subscriptions.filter(s => s.customerId === session?.id).length > 0 && (
               <div className="mb-8">
-                <h2 className="font-heading text-xl font-bold mb-4 text-brand-dark">Active Subscriptions</h2>
+                <h2 className="font-heading text-xl font-bold mb-4 text-brand-dark">Subscriptions</h2>
                 <div className="grid gap-4">
-                  {subscriptions.filter(s => s.customerId === session?.id && s.active).map(sub => (
-                    <div key={sub.id} className="bg-[#e8f3ff] rounded-2xl border border-brand-blue/30 p-4 sm:p-6 shadow-sm">
-                      <div className="flex justify-between items-start">
+                  {subscriptions.filter(s => s.customerId === session?.id).map(sub => (
+                    <div key={sub.id} className={`rounded-2xl border p-4 sm:p-6 shadow-sm transition-all ${sub.active ? 'bg-[#e8f3ff] border-brand-blue/30' : 'bg-slate-50 border-slate-200'}`}>
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
-                          <div className="font-heading font-black text-lg text-brand-blue mb-1">
-                            {sub.type === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {sub.qty}
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-heading font-black text-lg text-brand-blue">
+                              {sub.type === 'slim' ? '🔵 Slim' : '🟢 Round'} Gallon × {sub.qty}
+                            </span>
+                            <span className={`badge text-[10px] py-0.5 px-2 font-bold ${sub.active ? 'badge-paid' : 'bg-slate-200 text-slate-600'}`}>
+                              {sub.active ? 'Active' : 'Unsubscribed'}
+                            </span>
                           </div>
                           <div className="text-sm font-semibold text-brand-dark">
                             {(!sub.scheduleType || sub.scheduleType === 'interval') && `Deliver Every ${sub.intervalDays} Days`}
@@ -945,20 +965,41 @@ export default function CustomerPortal() {
                             {sub.scheduleType === 'exact' && `Scheduled for ${new Date(sub.exactDate!).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}`}
                           </div>
                           <div className="text-xs text-brand-gray mt-1">
-                            Next delivery: {new Date(sub.nextDeliveryDate).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+                            {sub.active ? (
+                              `Next delivery: ${new Date(sub.nextDeliveryDate).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}`
+                            ) : (
+                              'Recurring deliveries are currently paused / unsubscribed.'
+                            )}
                           </div>
                         </div>
-                        <button 
-                          onClick={() => handleOpenCancelModal(
-                            'subscription',
-                            sub.id,
-                            'Unsubscribe Recurring Delivery',
-                            `Are you sure you want to cancel your recurring subscription for ${sub.type === 'slim' ? 'Slim' : 'Round'} Gallon × ${sub.qty}? You can subscribe again anytime.`
+
+                        {/* Status-Based Display (Toggle Logic for Subscriptions) */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {sub.active ? (
+                            /* Active: Show Unsubscribe (Red/Gray), Hide Reactivate */
+                            <button 
+                              type="button"
+                              onClick={() => handleOpenCancelModal(
+                                'subscription',
+                                sub.id,
+                                'Are you sure you want to cancel this order?',
+                                `Are you sure you want to cancel your recurring subscription for ${sub.type === 'slim' ? 'Slim' : 'Round'} Gallon × ${sub.qty}? You can reactivate anytime.`
+                              )}
+                              className="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-full transition-colors shadow-xs flex items-center gap-1.5 active:scale-95"
+                            >
+                              <X size={14} /> Unsubscribe
+                            </button>
+                          ) : (
+                            /* Inactive / Unsubscribed: Show Reactivate (Green/Blue), Hide Unsubscribe */
+                            <button 
+                              type="button"
+                              onClick={() => handleInitiateReactivateSub(sub)}
+                              className="text-xs font-bold text-white bg-[#00a896] hover:bg-[#008f7f] border border-[#00a896] px-4 py-2 rounded-full transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 active:scale-95"
+                            >
+                              <RefreshCw size={14} /> Reactivate
+                            </button>
                           )}
-                          className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3.5 py-1.5 rounded-full transition-colors shadow-xs"
-                        >
-                          Unsubscribe
-                        </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1024,7 +1065,7 @@ export default function CustomerPortal() {
                           </button>
                         )}
                         {o.status === 'Pending' && (
-                          <div className="flex flex-col sm:flex-row gap-2 mt-2 sm:mt-1">
+                          <div className="flex gap-2 mt-2 sm:mt-1">
                             <button 
                               onClick={() => {
                                 const newAddress = window.prompt('Enter new delivery address:', o.address || '');
@@ -1032,20 +1073,9 @@ export default function CustomerPortal() {
                                   setOrders(orders.map(order => order.id === o.id ? { ...order, address: newAddress.trim() } : order));
                                 }
                               }}
-                              className="text-xs font-bold text-brand-blue hover:text-brand-dark bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors flex-1"
+                              className="text-xs font-bold text-brand-blue hover:text-brand-dark bg-blue-50 hover:bg-blue-100 px-3.5 py-1.5 rounded-full transition-colors"
                             >
                               Edit Address
-                            </button>
-                            <button 
-                              onClick={() => handleOpenCancelModal(
-                                'order',
-                                o.id,
-                                'Cancel Order',
-                                `Are you sure you want to cancel your order #${o.id.slice(-6).toUpperCase()} (${o.type === 'slim' ? 'Slim' : 'Round'} Gallon × ${o.qty})? This will release reserved stock.`
-                              )} 
-                              className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-colors flex-1"
-                            >
-                              Cancel Order
                             </button>
                           </div>
                         )}
@@ -1053,20 +1083,12 @@ export default function CustomerPortal() {
                     </div>
 
                     {isCancelled ? (
-                      <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-red-50 text-red-700 rounded-2xl font-bold mb-6 border border-red-200/80 gap-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">🚫</span>
-                          <div>
-                            <div>Order Cancelled</div>
-                            <div className="text-xs font-normal text-red-600">This order was cancelled and inventory was returned.</div>
-                          </div>
+                      <div className="flex items-center gap-3 p-4 bg-red-50 text-red-700 rounded-2xl font-bold mb-6 border border-red-200/80">
+                        <span className="text-xl">🚫</span>
+                        <div>
+                          <div>Order Cancelled / Unsubscribed</div>
+                          <div className="text-xs font-normal text-red-600">This order was cancelled. You can reactivate it anytime using the button below.</div>
                         </div>
-                        <button
-                          onClick={() => handleInitiateReactivate(o)}
-                          className="btn btn-sm bg-brand-blue text-white hover:bg-brand-blue-dark flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all shrink-0"
-                        >
-                          <RefreshCw size={14} /> Reactivate / Re-order
-                        </button>
                       </div>
                     ) : (
                       <div className="flex items-center mb-8 relative overflow-hidden px-1">
@@ -1093,21 +1115,66 @@ export default function CustomerPortal() {
                       </div>
                     )}
 
+                    {/* Unified Actions Column / Alignment at bottom of order card */}
                     <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-[#f0f3f8] text-sm text-brand-gray font-medium">
                       <div className="flex flex-wrap items-center gap-4">
-                        <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-brand-gray-light flex flex-center items-center justify-center">🚚</div> {o.method === 'delivery' ? 'Home Delivery' : 'Pick-up'}</div>
-                        {o.personnel && <div className="flex items-center gap-2 px-2"><div className="w-8 h-8 rounded-full bg-brand-gray-light flex flex-center items-center justify-center"><User size={14}/></div> {o.personnel}</div>}
-                        {o.containerReturn && <div className="text-[#2e7d32] flex items-center gap-2 bg-[#e8f5e9] px-3 py-1.5 rounded-lg">✅ Container returned</div>}
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-brand-gray-light flex items-center justify-center">🚚</div> 
+                          {o.method === 'delivery' ? 'Home Delivery' : 'Pick-up'}
+                        </div>
+                        {o.personnel && (
+                          <div className="flex items-center gap-2 px-2">
+                            <div className="w-8 h-8 rounded-full bg-brand-gray-light flex items-center justify-center"><User size={14}/></div> 
+                            {o.personnel}
+                          </div>
+                        )}
+                        {o.containerReturn && (
+                          <div className="text-[#2e7d32] flex items-center gap-2 bg-[#e8f5e9] px-3 py-1.5 rounded-lg">
+                            ✅ Container returned
+                          </div>
+                        )}
                       </div>
 
-                      {!isCancelled && o.status !== 'Pending' && (
-                        <button
-                          onClick={() => handleInitiateReactivate(o)}
-                          className="btn btn-sm bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ml-auto shadow-xs"
-                        >
-                          <RefreshCw size={13} /> Re-order
-                        </button>
-                      )}
+                      {/* Grouped Actions (Conditional Toggle Logic: Unsubscribe vs Reactivate) */}
+                      <div className="flex items-center gap-2 ml-auto">
+                        {/* Status-Based Display: Active/Ongoing -> Show Unsubscribe (Red/Gray), Hide Reactivate */}
+                        {(o.status === 'Pending' || o.status === 'Out for Delivery') && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCancelModal(
+                              'order',
+                              o.id,
+                              'Are you sure you want to cancel this order?',
+                              `Order #${o.id.slice(-6).toUpperCase()} (${o.type === 'slim' ? 'Slim' : 'Round'} Gallon × ${o.qty}) will be cancelled and gallons will be returned to inventory.`
+                            )}
+                            className="btn btn-sm bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+                          >
+                            <X size={14} /> Unsubscribe
+                          </button>
+                        )}
+
+                        {/* Status-Based Display: Cancelled/Unsubscribed -> Show Reactivate (Green/Blue), Hide Unsubscribe */}
+                        {o.status === 'Cancelled' && (
+                          <button
+                            type="button"
+                            onClick={() => handleInitiateReactivate(o)}
+                            className="btn btn-sm bg-[#00a896] hover:bg-[#008f7f] text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 active:scale-95"
+                          >
+                            <RefreshCw size={14} /> Reactivate
+                          </button>
+                        )}
+
+                        {/* Status-Based Display: Completed (Delivered/Claimed) -> Show Reactivate */}
+                        {(o.status === 'Delivered' || o.status === 'Claimed') && (
+                          <button
+                            type="button"
+                            onClick={() => handleInitiateReactivate(o)}
+                            className="btn btn-sm bg-[#0a6ed1] hover:bg-[#085ab3] text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 active:scale-95"
+                          >
+                            <RefreshCw size={14} /> Reactivate
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 );
@@ -1671,15 +1738,15 @@ export default function CustomerPortal() {
       </AnimatePresence>
     </main>
 
-    {/* Cancellation Confirmation Modal */}
+    {/* Cancellation / Unsubscribe Confirmation Modal (SweetAlert style) */}
     {cancelModalData && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
-          <div className="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center text-2xl mx-auto mb-4">
+          <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 border-4 border-red-50 flex items-center justify-center text-3xl mx-auto mb-4 animate-bounce">
             ⚠️
           </div>
           <h3 className="font-heading text-xl font-black text-center text-brand-dark mb-2">
-            {cancelModalData.title}
+            Are you sure you want to cancel this order?
           </h3>
           <p className="text-xs sm:text-sm text-brand-gray text-center mb-6 leading-relaxed">
             {cancelModalData.description}
@@ -1697,25 +1764,25 @@ export default function CustomerPortal() {
               onClick={handleExecuteCancel}
               className="w-full py-3 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md hover:shadow-lg transition-colors"
             >
-              Confirm Cancel
+              Yes, Cancel Order
             </button>
           </div>
         </div>
       </div>
     )}
 
-    {/* Reactivation Modal */}
+    {/* Reactivation Order Modal (SweetAlert style) */}
     {reactivateModalOrder && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
-          <div className="w-14 h-14 rounded-2xl bg-blue-100 text-brand-blue flex items-center justify-center text-2xl mx-auto mb-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#00a896] border-4 border-emerald-50 flex items-center justify-center text-3xl mx-auto mb-4">
             🔄
           </div>
-          <h3 className="font-heading text-xl font-black text-center text-brand-dark mb-1">
-            Reactivate / Re-order
+          <h3 className="font-heading text-xl font-black text-center text-brand-dark mb-2">
+            Do you want to reactivate this order and proceed to checkout?
           </h3>
           <p className="text-xs text-brand-gray text-center mb-6">
-            Would you like to instantly re-order with the previous details or review them in the order form first?
+            You can either instantly place this order or review and customize it in the order form first.
           </p>
 
           {/* Order Summary Details */}
@@ -1749,9 +1816,9 @@ export default function CustomerPortal() {
             <button
               type="button"
               onClick={handleConfirmReactivateDirect}
-              className="w-full py-3.5 rounded-full bg-brand-blue hover:bg-brand-blue-dark text-white font-black text-xs shadow-md hover:shadow-lg transition-all"
+              className="w-full py-3.5 rounded-full bg-[#00a896] hover:bg-[#008f7f] text-white font-black text-xs shadow-md hover:shadow-lg transition-all"
             >
-              ⚡ Instant Re-order (Place Order Now)
+              ✓ Yes, Proceed to Checkout
             </button>
             <button
               type="button"
@@ -1763,6 +1830,58 @@ export default function CustomerPortal() {
             <button
               type="button"
               onClick={() => setReactivateModalOrder(null)}
+              className="w-full py-2.5 text-xs text-brand-gray hover:text-brand-dark font-semibold transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Reactivate Subscription Modal (SweetAlert style) */}
+    {reactivateModalSub && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#00a896] border-4 border-emerald-50 flex items-center justify-center text-3xl mx-auto mb-4">
+            🔄
+          </div>
+          <h3 className="font-heading text-xl font-black text-center text-brand-dark mb-2">
+            Do you want to reactivate this order and proceed to checkout?
+          </h3>
+          <p className="text-xs text-brand-gray text-center mb-6">
+            Reactivating this subscription will resume your recurring deliveries every {reactivateModalSub.intervalDays || 7} days.
+          </p>
+
+          {/* Subscription Summary Details */}
+          <div className="p-4 bg-[#f4f7fb] rounded-2xl mb-6 space-y-2 text-xs">
+            <div className="flex justify-between font-bold text-brand-dark">
+              <span>Gallon Type:</span>
+              <span>{reactivateModalSub.type === 'slim' ? '🔵 Slim Gallon' : '🟢 Round Gallon'} × {reactivateModalSub.qty}</span>
+            </div>
+            <div className="flex justify-between text-brand-gray">
+              <span>Delivery Frequency:</span>
+              <span>Every {reactivateModalSub.intervalDays || 7} Days</span>
+            </div>
+            {reactivateModalSub.address && (
+              <div className="flex justify-between text-brand-gray">
+                <span>Address:</span>
+                <span className="truncate max-w-[180px]">{reactivateModalSub.address}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={handleConfirmReactivateSub}
+              className="w-full py-3.5 rounded-full bg-[#00a896] hover:bg-[#008f7f] text-white font-black text-xs shadow-md hover:shadow-lg transition-all"
+            >
+              ✓ Yes, Reactivate Subscription
+            </button>
+            <button
+              type="button"
+              onClick={() => setReactivateModalSub(null)}
               className="w-full py-2.5 text-xs text-brand-gray hover:text-brand-dark font-semibold transition-colors"
             >
               Cancel
