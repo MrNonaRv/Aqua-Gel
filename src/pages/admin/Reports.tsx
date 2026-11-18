@@ -5,16 +5,83 @@ import { formatCurrency } from '../../lib/format';
 
 export default function Reports() {
   const { orders } = useStore();
-  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'>('weekly');
   const [subFilter, setSubFilter] = useState<{name: string, start: number, end: number} | null>(null);
+
+  // Advanced Date Range & Quick Filters
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [activeDateFilter, setActiveDateFilter] = useState<'today' | 'yesterday' | '7days' | 'month' | 'year' | 'custom' | ''>('7days');
 
   useEffect(() => {
     setSubFilter(null);
   }, [period]);
 
   const now = new Date();
+
+  const applyQuickDateFilter = (filter: 'today' | 'yesterday' | '7days' | 'month' | 'year' | 'clear') => {
+    const today = new Date();
+    const formatDate = (d: Date) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    setSubFilter(null);
+
+    if (filter === 'clear') {
+      setDateFrom('');
+      setDateTo('');
+      setActiveDateFilter('');
+      setPeriod('weekly');
+      return;
+    }
+
+    if (filter === 'today') {
+      const t = formatDate(today);
+      setDateFrom(t);
+      setDateTo(t);
+      setActiveDateFilter('today');
+      setPeriod('daily');
+    } else if (filter === 'yesterday') {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      const yStr = formatDate(y);
+      setDateFrom(yStr);
+      setDateTo(yStr);
+      setActiveDateFilter('yesterday');
+      setPeriod('custom');
+    } else if (filter === '7days') {
+      const past = new Date(today);
+      past.setDate(past.getDate() - 6);
+      setDateFrom(formatDate(past));
+      setDateTo(formatDate(today));
+      setActiveDateFilter('7days');
+      setPeriod('weekly');
+    } else if (filter === 'month') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setDateFrom(formatDate(firstDay));
+      setDateTo(formatDate(lastDay));
+      setActiveDateFilter('month');
+      setPeriod('monthly');
+    } else if (filter === 'year') {
+      const firstDay = new Date(today.getFullYear(), 0, 1);
+      const lastDay = new Date(today.getFullYear(), 11, 31);
+      setDateFrom(formatDate(firstDay));
+      setDateTo(formatDate(lastDay));
+      setActiveDateFilter('year');
+      setPeriod('yearly');
+    }
+  };
   
   const getRange = (p: string) => {
+    if (p === 'custom' && (dateFrom || dateTo)) {
+      const s = dateFrom ? new Date(dateFrom + 'T00:00:00').getTime() : new Date(0).getTime();
+      const e = dateTo ? new Date(dateTo + 'T23:59:59.999').getTime() : Date.now();
+      return { start: s, end: e };
+    }
     let start, end;
     if (p === 'daily') {
       start = new Date(now); start.setHours(0, 0, 0, 0);
@@ -91,6 +158,60 @@ export default function Reports() {
       const total = basePaid.filter(o => o.date >= ws && o.date < weMs).reduce((s, o) => s + o.total, 0);
       return { name: `Week ${i+1}`, total, startMs: ws, endMs: weMs - 1 };
     });
+  } else if (period === 'custom') {
+    const dayDiff = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    if (dayDiff <= 1) {
+      chartTitle = `Income for ${new Date(start).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })} (by Hour)`;
+      const hours = Array.from({length: 24}, (_, i) => i);
+      chartData = hours.map(h => {
+        const hs = new Date(start); hs.setHours(h, 0, 0, 0);
+        const he = new Date(start); he.setHours(h, 59, 59, 999);
+        const total = basePaid.filter(o => o.date >= hs.getTime() && o.date <= he.getTime()).reduce((s, o) => s + o.total, 0);
+        return {
+          name: `${h === 0 ? 12 : h > 12 ? h - 12 : h}${h >= 12 ? 'pm' : 'am'}`,
+          total,
+          startMs: hs.getTime(),
+          endMs: he.getTime()
+        };
+      });
+    } else if (dayDiff <= 31) {
+      chartTitle = `Daily Income (${new Date(start).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} - ${new Date(end).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })})`;
+      const days = [];
+      const curr = new Date(start);
+      curr.setHours(0, 0, 0, 0);
+      while (curr.getTime() <= end) {
+        days.push(new Date(curr));
+        curr.setDate(curr.getDate() + 1);
+      }
+      chartData = days.map(d => {
+        const ds = new Date(d); ds.setHours(0, 0, 0, 0);
+        const de = new Date(d); de.setHours(23, 59, 59, 999);
+        const total = basePaid.filter(o => o.date >= ds.getTime() && o.date <= de.getTime()).reduce((s, o) => s + o.total, 0);
+        return {
+          name: d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
+          total,
+          startMs: ds.getTime(),
+          endMs: de.getTime()
+        };
+      });
+    } else {
+      chartTitle = `Monthly Income (${new Date(start).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })} - ${new Date(end).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })})`;
+      const monthsMap = new Map<string, { name: string; total: number; startMs: number; endMs: number }>();
+      for (const o of basePaid) {
+        const d = new Date(o.date);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        const name = d.toLocaleDateString('en-PH', { month: 'short', year: '2-digit' });
+        const existing = monthsMap.get(key) || { 
+          name, 
+          total: 0, 
+          startMs: new Date(d.getFullYear(), d.getMonth(), 1).getTime(), 
+          endMs: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999).getTime() 
+        };
+        existing.total += o.total;
+        monthsMap.set(key, existing);
+      }
+      chartData = Array.from(monthsMap.values());
+    }
   } else {
     chartTitle = 'Income by Month (This Year)';
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -118,7 +239,13 @@ export default function Reports() {
   // Calculate active customers for this period (customers who placed at least one order)
   const activeCustomersCount = new Set(finalOrders.map(o => o.customerId)).size;
 
-  const periodLabels = { daily: 'Today', weekly: 'Last 7 Days', monthly: 'This Month', yearly: 'This Year' };
+  const periodLabels: Record<string, string> = { 
+    daily: 'Today', 
+    weekly: 'Last 7 Days', 
+    monthly: 'This Month', 
+    yearly: 'This Year',
+    custom: (dateFrom || dateTo) ? `${dateFrom || 'Start'} to ${dateTo || 'End'}` : 'Custom Range'
+  };
 
   return (
     <div className="max-w-6xl mx-auto print:max-w-full print:m-0 print:p-4">
@@ -140,7 +267,92 @@ export default function Reports() {
         <p className="text-brand-gray text-sm">Report Period: {subFilter ? subFilter.name : periodLabels[period]} ({new Date().toLocaleString('en-PH')})</p>
       </div>
 
-      {(period === 'daily' || period === 'weekly' || subFilter) && (
+      {/* Advanced Date Range & Quick Filters */}
+      <div className="bg-white p-4 rounded-2xl border border-brand-border shadow-sm mb-6 print:hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-brand-dark uppercase tracking-wider">From:</label>
+              <input 
+                type="date" 
+                className="form-control py-1.5 px-3 text-sm bg-slate-50 border-brand-border w-auto rounded-xl"
+                value={dateFrom} 
+                onChange={e => { 
+                  setDateFrom(e.target.value); 
+                  setActiveDateFilter('custom'); 
+                  setPeriod('custom');
+                  setSubFilter(null);
+                }} 
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-brand-dark uppercase tracking-wider">To:</label>
+              <input 
+                type="date" 
+                className="form-control py-1.5 px-3 text-sm bg-slate-50 border-brand-border w-auto rounded-xl"
+                value={dateTo} 
+                onChange={e => { 
+                  setDateTo(e.target.value); 
+                  setActiveDateFilter('custom'); 
+                  setPeriod('custom');
+                  setSubFilter(null);
+                }} 
+              />
+            </div>
+          </div>
+
+          {/* Quick Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-bold text-brand-gray mr-1">Quick Filters:</span>
+            <button
+              type="button"
+              onClick={() => applyQuickDateFilter('today')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${activeDateFilter === 'today' ? 'bg-brand-blue text-white shadow-xs' : 'bg-slate-50 border border-brand-border text-slate-700 hover:bg-slate-100'}`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => applyQuickDateFilter('yesterday')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${activeDateFilter === 'yesterday' ? 'bg-brand-blue text-white shadow-xs' : 'bg-slate-50 border border-brand-border text-slate-700 hover:bg-slate-100'}`}
+            >
+              Yesterday
+            </button>
+            <button
+              type="button"
+              onClick={() => applyQuickDateFilter('7days')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${activeDateFilter === '7days' ? 'bg-brand-blue text-white shadow-xs' : 'bg-slate-50 border border-brand-border text-slate-700 hover:bg-slate-100'}`}
+            >
+              Last 7 Days
+            </button>
+            <button
+              type="button"
+              onClick={() => applyQuickDateFilter('month')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${activeDateFilter === 'month' ? 'bg-brand-blue text-white shadow-xs' : 'bg-slate-50 border border-brand-border text-slate-700 hover:bg-slate-100'}`}
+            >
+              This Month
+            </button>
+            <button
+              type="button"
+              onClick={() => applyQuickDateFilter('year')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${activeDateFilter === 'year' ? 'bg-brand-blue text-white shadow-xs' : 'bg-slate-50 border border-brand-border text-slate-700 hover:bg-slate-100'}`}
+            >
+              This Year
+            </button>
+            {(dateFrom || dateTo || activeDateFilter !== '7days') && (
+              <button
+                type="button"
+                onClick={() => applyQuickDateFilter('clear')}
+                className="px-2.5 py-1 text-xs font-bold text-red-500 hover:text-red-700 hover:underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {(period === 'daily' || period === 'weekly' || period === 'custom' || subFilter) && (
         <div className="bg-gradient-to-r from-brand-blue to-brand-teal text-white p-6 rounded-2xl mb-8 shadow-md print:bg-none print:bg-white print:border print:border-brand-border print:text-brand-dark">
           <div className="text-white/80 print:text-brand-gray font-medium mb-1 uppercase tracking-wider text-sm">Total Income {subFilter ? subFilter.name : periodLabels[period]}</div>
           <div className="font-heading text-4xl font-bold">₱{formatCurrency(income)}</div>

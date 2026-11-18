@@ -40,6 +40,10 @@ export interface Order {
   checkoutUrl?: string;
   status: 'Pending' | 'Out for Delivery' | 'Delivered' | 'Claimed' | 'Cancelled';
   total: number;
+  subtotal?: number;
+  discountType?: 'percentage' | 'flat';
+  discountValue?: number;
+  discountAmount?: number;
   paid: boolean;
   date: number;
   personnel: string | null;

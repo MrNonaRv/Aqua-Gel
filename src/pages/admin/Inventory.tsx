@@ -13,6 +13,61 @@ export default function Inventory() {
   const [roundDiscount, setRoundDiscount] = useState(inventory.discountRound?.toString() || '');
   const [roundDiscountExp, setRoundDiscountExp] = useState(inventory.discountRoundValidUntil ? new Date(inventory.discountRoundValidUntil).toISOString().split('T')[0] : '');
 
+  const [slimPctSelect, setSlimPctSelect] = useState<string>(() => {
+    if (inventory.discountSlim && inventory.priceSlim) {
+      const calcPct = Math.round((1 - inventory.discountSlim / inventory.priceSlim) * 100);
+      return calcPct >= 1 && calcPct <= 50 ? calcPct.toString() : '';
+    }
+    return '';
+  });
+  const [roundPctSelect, setRoundPctSelect] = useState<string>(() => {
+    if (inventory.discountRound && inventory.priceRound) {
+      const calcPct = Math.round((1 - inventory.discountRound / inventory.priceRound) * 100);
+      return calcPct >= 1 && calcPct <= 50 ? calcPct.toString() : '';
+    }
+    return '';
+  });
+
+  const discountPercentages = Array.from({ length: 50 }, (_, i) => i + 1);
+
+  const handleSlimPctChange = (pctStr: string) => {
+    setSlimPctSelect(pctStr);
+    if (!pctStr) {
+      setSlimDiscount('');
+      return;
+    }
+    const pct = parseFloat(pctStr);
+    const base = parseFloat(slimPrice);
+    if (!isNaN(pct) && !isNaN(base)) {
+      const discounted = base * (1 - pct / 100);
+      setSlimDiscount(discounted.toFixed(2));
+      if (!slimDiscountExp) {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        setSlimDiscountExp(d.toISOString().split('T')[0]);
+      }
+    }
+  };
+
+  const handleRoundPctChange = (pctStr: string) => {
+    setRoundPctSelect(pctStr);
+    if (!pctStr) {
+      setRoundDiscount('');
+      return;
+    }
+    const pct = parseFloat(pctStr);
+    const base = parseFloat(roundPrice);
+    if (!isNaN(pct) && !isNaN(base)) {
+      const discounted = base * (1 - pct / 100);
+      setRoundDiscount(discounted.toFixed(2));
+      if (!roundDiscountExp) {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        setRoundDiscountExp(d.toISOString().split('T')[0]);
+      }
+    }
+  };
+
   const [slimAdd, setSlimAdd] = useState('');
   const [roundAdd, setRoundAdd] = useState('');
 
@@ -205,29 +260,39 @@ export default function Inventory() {
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="font-bold text-brand-dark">Slim Gallons</h3>
                   <button 
-                    onClick={() => { setSlimDiscount(''); setSlimDiscountExp(''); }} 
+                    onClick={() => { 
+                      setSlimDiscount(''); 
+                      setSlimDiscountExp(''); 
+                      setSlimPctSelect('');
+                    }} 
                     className="text-xs font-semibold text-brand-red hover:underline"
                   >
                     Remove Discount
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {[2, 5, 10].map(pct => (
-                    <button 
-                      key={pct}
-                      className="px-2.5 py-1 bg-white text-brand-dark text-xs rounded-lg border border-brand-border hover:bg-slate-50 transition-colors font-medium shadow-sm"
-                      onClick={() => setSlimDiscount(formatCurrency(parseFloat(slimPrice) * (1 - pct/100)))}
-                    >
-                      {pct}% Off
-                    </button>
-                  ))}
+                <div className="mb-3">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 block">
+                    Select Discount (1% to 50%)
+                  </label>
+                  <select 
+                    className="form-control text-xs py-2 px-3 w-full bg-white font-medium border-brand-border focus:border-brand-blue"
+                    value={slimPctSelect}
+                    onChange={e => handleSlimPctChange(e.target.value)}
+                  >
+                    <option value="">-- Choose Discount Percentage (1% - 50%) --</option>
+                    {discountPercentages.map(pct => (
+                      <option key={pct} value={pct}>
+                        {pct}% Off (₱{(parseFloat(slimPrice || '0') * (1 - pct/100)).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="form-group !mb-0">
                     <label className="text-xs">Discount Price (₱)</label>
-                    <input type="number" className="form-control py-1.5" min="0" placeholder="No discount" value={slimDiscount} onChange={e => setSlimDiscount(e.target.value)} />
+                    <input type="number" className="form-control py-1.5" min="0" placeholder="No discount" value={slimDiscount} onChange={e => { setSlimDiscount(e.target.value); setSlimPctSelect(''); }} />
                   </div>
                   <div className="form-group !mb-0">
                     <label className="text-xs">Valid Until</label>
@@ -240,29 +305,39 @@ export default function Inventory() {
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="font-bold text-brand-dark">Round Gallons</h3>
                   <button 
-                    onClick={() => { setRoundDiscount(''); setRoundDiscountExp(''); }} 
+                    onClick={() => { 
+                      setRoundDiscount(''); 
+                      setRoundDiscountExp(''); 
+                      setRoundPctSelect('');
+                    }} 
                     className="text-xs font-semibold text-brand-red hover:underline"
                   >
                     Remove Discount
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {[2, 5, 10].map(pct => (
-                    <button 
-                      key={pct}
-                      className="px-2.5 py-1 bg-white text-brand-dark text-xs rounded-lg border border-brand-border hover:bg-slate-50 transition-colors font-medium shadow-sm"
-                      onClick={() => setRoundDiscount(formatCurrency(parseFloat(roundPrice) * (1 - pct/100)))}
-                    >
-                      {pct}% Off
-                    </button>
-                  ))}
+                <div className="mb-3">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 block">
+                    Select Discount (1% to 50%)
+                  </label>
+                  <select 
+                    className="form-control text-xs py-2 px-3 w-full bg-white font-medium border-brand-border focus:border-brand-blue"
+                    value={roundPctSelect}
+                    onChange={e => handleRoundPctChange(e.target.value)}
+                  >
+                    <option value="">-- Choose Discount Percentage (1% - 50%) --</option>
+                    {discountPercentages.map(pct => (
+                      <option key={pct} value={pct}>
+                        {pct}% Off (₱{(parseFloat(roundPrice || '0') * (1 - pct/100)).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="form-group !mb-0">
                     <label className="text-xs">Discount Price (₱)</label>
-                    <input type="number" className="form-control py-1.5" min="0" placeholder="No discount" value={roundDiscount} onChange={e => setRoundDiscount(e.target.value)} />
+                    <input type="number" className="form-control py-1.5" min="0" placeholder="No discount" value={roundDiscount} onChange={e => { setRoundDiscount(e.target.value); setRoundPctSelect(''); }} />
                   </div>
                   <div className="form-group !mb-0">
                     <label className="text-xs">Valid Until</label>

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useStore } from '../../lib/store';
+import { useStore, Order } from '../../lib/store';
 import { useCustomerNotifications } from '../../lib/notifications';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Package, User, Power, MapPin, Phone, Menu, X, CreditCard } from 'lucide-react';
+import { ShoppingCart, Package, User, Power, MapPin, Phone, Menu, X, CreditCard, HelpCircle, Mail, RefreshCw, AlertCircle, Clock, ShieldCheck, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SlimGallonIcon, RoundGallonIcon } from '../../components/icons/Gallons';
 import { toast } from 'sonner';
@@ -24,8 +24,20 @@ export default function CustomerPortal() {
     }
   }, [subscriptions.length, session?.id]);
   const navigate = useNavigate();
-  const [tab, setTab] = useState<'order' | 'myorders' | 'payments' | 'profile'>('order');
+  const [tab, setTab] = useState<'order' | 'myorders' | 'payments' | 'profile' | 'support'>('order');
+  const [profileSubTab, setProfileSubTab] = useState<'details' | 'support'>('details');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Cancellation Modal State
+  const [cancelModalData, setCancelModalData] = useState<{
+    type: 'order' | 'subscription';
+    id: string;
+    title: string;
+    description: string;
+  } | null>(null);
+
+  // Reactivation Modal State
+  const [reactivateModalOrder, setReactivateModalOrder] = useState<Order | null>(null);
 
   const customer = customers.find(c => c.id === session?.id);
 
@@ -347,22 +359,109 @@ export default function CustomerPortal() {
     setTimeout(() => setOrderSuccess(''), 5000);
   };
 
-  const handleCancelOrder = (orderId: string) => {
-    const confirmCancel = window.confirm('Are you sure you want to cancel this order?');
-    if (!confirmCancel) return;
+  const handleOpenCancelModal = (type: 'order' | 'subscription', id: string, title: string, description: string) => {
+    setCancelModalData({ type, id, title, description });
+  };
 
-    const order = orders.find(o => o.id === orderId);
-    if (!order || order.status !== 'Pending') return;
+  const handleExecuteCancel = () => {
+    if (!cancelModalData) return;
 
-    setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'Cancelled' } : o));
-    setInventory({ ...inventory, [order.type]: inventory[order.type] + order.qty });
-    if (!order.paid) {
-      setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, c.unpaid - order.total) } : c));
+    if (cancelModalData.type === 'order') {
+      const order = orders.find(o => o.id === cancelModalData.id);
+      if (!order || order.status === 'Cancelled') {
+        setCancelModalData(null);
+        return;
+      }
+
+      setOrders(orders.map(o => o.id === order.id ? { ...o, status: 'Cancelled' } : o));
+      setInventory({ ...inventory, [order.type]: inventory[order.type] + order.qty });
+      
+      if (!order.paid) {
+        setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, (c.unpaid || 0) - order.total) } : c));
+      }
+      toast.success('Order Cancelled', {
+        description: `Order #${order.id.slice(-6).toUpperCase()} has been cancelled.`
+      });
+    } else {
+      setSubscriptions(subscriptions.map(s => s.id === cancelModalData.id ? { ...s, active: false } : s));
+      toast.success('Subscription Cancelled', {
+        description: 'You have unsubscribed from recurring deliveries. You can resubscribe anytime.'
+      });
     }
+
+    setCancelModalData(null);
+  };
+
+  const handleInitiateReactivate = (order: Order) => {
+    setReactivateModalOrder(order);
+  };
+
+  const handleConfirmReactivateDirect = () => {
+    if (!reactivateModalOrder) return;
     
-    if (order.paymentMethod === 'cash' && order.customerId !== 'guest') {
-      setCustomers(customers.map(c => c.id === order.customerId ? { ...c, unpaid: Math.max(0, c.unpaid - order.total) } : c));
+    // Check inventory
+    if (inventory[reactivateModalOrder.type] < reactivateModalOrder.qty) {
+      toast.error('Insufficient Stock', {
+        description: `Sorry, there are only ${inventory[reactivateModalOrder.type]} ${reactivateModalOrder.type} gallon(s) left in stock.`
+      });
+      return;
     }
+
+    // Get current unit price and loyalty discount
+    const currentPrice = getUnitPrice(reactivateModalOrder.type);
+    const subtotal = reactivateModalOrder.qty * currentPrice;
+    const isLoyal = customer?.isLoyal || false;
+    const loyaltyDiscount = isLoyal ? subtotal * 0.02 : 0;
+    const newTotal = Number(Math.max(0, subtotal - loyaltyDiscount).toFixed(2));
+
+    const newOrder: Order = {
+      id: 'o' + Date.now(),
+      customerId: reactivateModalOrder.customerId,
+      customerName: reactivateModalOrder.customerName,
+      type: reactivateModalOrder.type,
+      qty: reactivateModalOrder.qty,
+      method: reactivateModalOrder.method,
+      paymentMethod: reactivateModalOrder.paymentMethod || 'cash',
+      status: 'Pending',
+      subtotal: Number(subtotal.toFixed(2)),
+      discountType: isLoyal ? 'percentage' : undefined,
+      discountValue: isLoyal ? 2 : undefined,
+      discountAmount: isLoyal ? Number(loyaltyDiscount.toFixed(2)) : undefined,
+      total: newTotal,
+      paid: false,
+      date: Date.now(),
+      personnel: null,
+      address: reactivateModalOrder.address || customer?.address || null,
+      containerReturn: false,
+      deliveryNotes: reactivateModalOrder.deliveryNotes
+    };
+
+    setOrders([newOrder, ...orders]);
+    setInventory({ ...inventory, [newOrder.type]: inventory[newOrder.type] - newOrder.qty });
+
+    if (newOrder.paymentMethod === 'cash') {
+      setCustomers(customers.map(c => c.id === newOrder.customerId ? { ...c, unpaid: (c.unpaid || 0) + newTotal } : c));
+    }
+
+    setReactivateModalOrder(null);
+    setTab('myorders');
+    toast.success('Order Reactivated!', {
+      description: `Your order for ${newOrder.qty} ${newOrder.type} gallon(s) has been placed successfully.`
+    });
+  };
+
+  const handleConfirmReactivateToCart = () => {
+    if (!reactivateModalOrder) return;
+    setSelectedType(reactivateModalOrder.type);
+    setQty(reactivateModalOrder.qty);
+    setMethod(reactivateModalOrder.method);
+    if (reactivateModalOrder.address) setAddress(reactivateModalOrder.address);
+    if (reactivateModalOrder.deliveryNotes) setDeliveryNotes(reactivateModalOrder.deliveryNotes);
+    if (reactivateModalOrder.paymentMethod) setPaymentMethod(reactivateModalOrder.paymentMethod);
+    
+    setReactivateModalOrder(null);
+    setTab('order');
+    toast.info('Order details loaded into order form for your review.');
   };
 
   const myOrders = orders.filter(o => o.customerId === session?.id).sort((a,b) => b.date - a.date);
@@ -417,6 +516,12 @@ export default function CustomerPortal() {
             onClick={() => { setTab('profile'); setIsSidebarOpen(false); }}
           >
             <User size={18} /> My Profile
+          </button>
+          <button 
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${tab === 'support' ? 'bg-[#0a6ed1] text-white font-medium' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+            onClick={() => { setTab('support'); setIsSidebarOpen(false); }}
+          >
+            <HelpCircle size={18} /> Customer Support & About
           </button>
         </nav>
 
@@ -844,14 +949,15 @@ export default function CustomerPortal() {
                           </div>
                         </div>
                         <button 
-                          onClick={() => {
-                            if (window.confirm('Cancel this recurring subscription?')) {
-                              setSubscriptions(subscriptions.map(s => s.id === sub.id ? { ...s, active: false } : s));
-                            }
-                          }}
-                          className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-colors"
+                          onClick={() => handleOpenCancelModal(
+                            'subscription',
+                            sub.id,
+                            'Unsubscribe Recurring Delivery',
+                            `Are you sure you want to cancel your recurring subscription for ${sub.type === 'slim' ? 'Slim' : 'Round'} Gallon × ${sub.qty}? You can subscribe again anytime.`
+                          )}
+                          className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3.5 py-1.5 rounded-full transition-colors shadow-xs"
                         >
-                          Cancel
+                          Unsubscribe
                         </button>
                       </div>
                     </div>
@@ -870,7 +976,7 @@ export default function CustomerPortal() {
               }}
               className="flex flex-col gap-6"
             >
-              {myOrders.length > 0 ? myOrders.map((o, index) => {
+              {myOrders.length > 0 ? myOrders.map((o) => {
                 const isCancelled = o.status === 'Cancelled';
                 const steps = ['Pending', 'Out for Delivery', 'Delivered'];
                 const currentStepIndex = steps.indexOf(o.status);
@@ -880,7 +986,7 @@ export default function CustomerPortal() {
                     variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
                     whileHover={{ scale: 1.01, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
                     key={o.id} 
-                    className={`bg-white rounded-2xl sm:rounded-3xl border ${isCancelled ? 'border-red-200 bg-red-50/30' : 'border-brand-border'} p-4 sm:p-6 md:p-8 shadow-sm transition-all duration-200`}
+                    className={`bg-white rounded-2xl sm:rounded-3xl border ${isCancelled ? 'border-red-200 bg-red-50/20' : 'border-brand-border'} p-4 sm:p-6 md:p-8 shadow-sm transition-all duration-200`}
                   >
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
                       <div>
@@ -892,7 +998,14 @@ export default function CustomerPortal() {
                         </div>
                       </div>
                       <div className="sm:text-right w-full sm:w-auto flex sm:flex-col justify-between sm:justify-start items-center sm:items-end gap-2">
-                        <div className="font-heading font-black text-xl sm:text-2xl text-brand-dark">₱{o.total}</div>
+                        <div className="font-heading font-black text-xl sm:text-2xl text-brand-dark">
+                          ₱{formatCurrency(o.total)}
+                          {o.discountAmount && o.discountAmount > 0 && (
+                            <div className="text-[11px] font-semibold text-brand-green">
+                              -{o.discountType === 'percentage' ? `${o.discountValue}%` : `₱${formatCurrency(o.discountAmount)}`} off
+                            </div>
+                          )}
+                        </div>
                         <div className="flex gap-1.5 justify-end">
                           <span className={`badge py-0.5 px-2 text-[10px] sm:text-xs font-bold leading-none ${o.paid ? 'badge-paid' : 'badge-unpaid'}`}>{o.paid ? 'Paid' : 'Unpaid'}</span>
                           {o.paymentMethod && <span className="badge py-0.5 px-2 text-[10px] sm:text-xs font-bold leading-none bg-brand-gray-light text-brand-gray uppercase">{o.paymentMethod}</span>}
@@ -905,7 +1018,7 @@ export default function CustomerPortal() {
                         {o.status === 'Pending' && !o.paid && o.checkoutUrl && o.paymentMethod === 'gcash' && (
                           <button 
                             onClick={() => window.open(o.checkoutUrl, '_blank')}
-                            className="text-xs font-bold text-white hover:text-white bg-[#0a6ed1] hover:bg-[#085ab3] px-3 py-1.5 rounded-full mt-2 transition-colors block w-full sm:w-auto"
+                            className="text-xs font-bold text-white hover:text-white bg-[#0a6ed1] hover:bg-[#085ab3] px-3 py-1.5 rounded-full mt-2 transition-colors block w-full sm:w-auto shadow-xs"
                           >
                             Complete Payment
                           </button>
@@ -924,7 +1037,12 @@ export default function CustomerPortal() {
                               Edit Address
                             </button>
                             <button 
-                              onClick={() => handleCancelOrder(o.id)} 
+                              onClick={() => handleOpenCancelModal(
+                                'order',
+                                o.id,
+                                'Cancel Order',
+                                `Are you sure you want to cancel your order #${o.id.slice(-6).toUpperCase()} (${o.type === 'slim' ? 'Slim' : 'Round'} Gallon × ${o.qty})? This will release reserved stock.`
+                              )} 
                               className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-colors flex-1"
                             >
                               Cancel Order
@@ -935,8 +1053,20 @@ export default function CustomerPortal() {
                     </div>
 
                     {isCancelled ? (
-                      <div className="flex items-center justify-center p-6 bg-red-50 text-red-600 rounded-xl font-bold mb-8 border border-red-100">
-                        🚫 Order Cancelled
+                      <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-red-50 text-red-700 rounded-2xl font-bold mb-6 border border-red-200/80 gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🚫</span>
+                          <div>
+                            <div>Order Cancelled</div>
+                            <div className="text-xs font-normal text-red-600">This order was cancelled and inventory was returned.</div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleInitiateReactivate(o)}
+                          className="btn btn-sm bg-brand-blue text-white hover:bg-brand-blue-dark flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all shrink-0"
+                        >
+                          <RefreshCw size={14} /> Reactivate / Re-order
+                        </button>
                       </div>
                     ) : (
                       <div className="flex items-center mb-8 relative overflow-hidden px-1">
@@ -957,30 +1087,27 @@ export default function CustomerPortal() {
                               <span className={`text-[10px] sm:text-xs text-center font-bold max-w-[70px] sm:max-w-none leading-snug ${isCurrent ? 'text-[#0a6ed1]' : isCompleted ? 'text-brand-dark' : 'text-brand-gray'}`}>
                                 {step}
                               </span>
-                        {/* Success Notification */}
-      <AnimatePresence>
-        {orderSuccess && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, x: '-50%' }}
-            animate={{ opacity: 1, y: 0, x: '-50%' }}
-            exit={{ opacity: 0, y: 20, x: '-50%' }}
-            className="fixed bottom-6 left-1/2 z-[100] bg-[#00a896] text-white px-6 py-4 rounded-2xl shadow-xl font-medium w-[90%] max-w-sm text-center border border-white/20 backdrop-blur-md"
-          >
-            {orderSuccess}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-)}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
-                    <div className="flex flex-wrap gap-4 pt-6 border-t border-[#f0f3f8] text-sm text-brand-gray font-medium">
-                      <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-brand-gray-light flex flex-center items-center justify-center">🚚</div> {o.method === 'delivery' ? 'Home Delivery' : 'Pick-up'}</div>
-                      {o.personnel && <div className="flex items-center gap-2 px-2"><div className="w-8 h-8 rounded-full bg-brand-gray-light flex flex-center items-center justify-center"><User size={14}/></div> {o.personnel}</div>}
-                      {o.containerReturn && <div className="text-[#2e7d32] flex items-center gap-2 ml-auto bg-[#e8f5e9] px-3 py-1.5 rounded-lg">✅ Container returned</div>}
+                    <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-[#f0f3f8] text-sm text-brand-gray font-medium">
+                      <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-brand-gray-light flex flex-center items-center justify-center">🚚</div> {o.method === 'delivery' ? 'Home Delivery' : 'Pick-up'}</div>
+                        {o.personnel && <div className="flex items-center gap-2 px-2"><div className="w-8 h-8 rounded-full bg-brand-gray-light flex flex-center items-center justify-center"><User size={14}/></div> {o.personnel}</div>}
+                        {o.containerReturn && <div className="text-[#2e7d32] flex items-center gap-2 bg-[#e8f5e9] px-3 py-1.5 rounded-lg">✅ Container returned</div>}
+                      </div>
+
+                      {!isCancelled && o.status !== 'Pending' && (
+                        <button
+                          onClick={() => handleInitiateReactivate(o)}
+                          className="btn btn-sm bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ml-auto shadow-xs"
+                        >
+                          <RefreshCw size={13} /> Re-order
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 );
@@ -1133,12 +1260,12 @@ export default function CustomerPortal() {
             transition={{ duration: 0.4 }}
             className="max-w-xl"
           >
-            <div className="mb-8 flex justify-between items-center">
+            <div className="mb-6 flex justify-between items-center">
               <div>
                 <h1 className="font-heading text-3xl font-bold mb-2">My Profile</h1>
-                <p className="text-brand-gray text-lg">Your account details and balance</p>
+                <p className="text-brand-gray text-lg">Your account details and customer support</p>
               </div>
-              {!isEditingProfile && (
+              {profileSubTab === 'details' && !isEditingProfile && (
                 <button 
                   onClick={handleEditProfileStart}
                   className="bg-white border border-brand-border text-brand-dark px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 transition-colors"
@@ -1148,148 +1275,503 @@ export default function CustomerPortal() {
               )}
             </div>
 
-            <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 shadow-sm">
-              <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6 mb-8 pb-8 border-b border-brand-border">
-                {customer.profilePictureUrl ? (
-                  <img src={customer.profilePictureUrl} alt="Profile" className="w-20 h-20 rounded-2xl shadow-lg shrink-0 object-cover" />
-                ) : (
-                  <div className="w-20 h-20 bg-gradient-to-br from-[#00a896] to-[#0a6ed1] rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg shrink-0">
-                    {customer.name[0]}
-                  </div>
-                )}
-                <div className="flex-1">
-                  <h2 className="font-heading font-bold text-2xl text-brand-dark mb-1 flex items-center justify-center sm:justify-start gap-2">
-                    {customer.name}
-                    {customer.isLoyal && <span title="Loyal / Regular Customer" className="text-yellow-400 drop-shadow-sm text-xl lg:text-2xl">⭐</span>}
-                  </h2>
-                  <div className="text-brand-gray font-medium mb-3">@{customer.username}</div>
-                  {isEditingProfile ? (
-                    <div className="mt-4">
-                      <label className="block text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2 text-left">Upload Profile Picture (Optional)</label>
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        className="form-control text-sm py-2 mb-4 w-full file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20"
-                        onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setEditProfilePicUrl(reader.result as string);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
+            {/* Profile Sub-tabs */}
+            <div className="flex gap-2 mb-6 bg-white p-1.5 rounded-2xl border border-brand-border w-fit shadow-xs">
+              <button
+                type="button"
+                onClick={() => setProfileSubTab('details')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${profileSubTab === 'details' ? 'bg-[#0a6ed1] text-white shadow-xs' : 'text-brand-gray hover:text-brand-dark'}`}
+              >
+                👤 Account Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setProfileSubTab('support')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${profileSubTab === 'support' ? 'bg-[#0a6ed1] text-white shadow-xs' : 'text-brand-gray hover:text-brand-dark'}`}
+              >
+                💬 About & Customer Support
+              </button>
+            </div>
+
+            {profileSubTab === 'support' ? (
+              <div className="space-y-6">
+                {/* Direct Contact Card */}
+                <div className="bg-gradient-to-br from-[#0a6ed1] to-[#00a896] text-white p-6 sm:p-8 rounded-3xl shadow-md">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl">
+                      🎧
                     </div>
-                  ) : (
-                    customer.isLoyal ? (
-                      <span className="badge py-1 px-3 bg-gradient-to-r from-yellow-100 to-amber-50 text-yellow-800 border border-yellow-300 shadow-sm flex items-center gap-1.5 w-fit mx-auto sm:mx-0">
-                        ⭐ <span className="font-bold">Loyal / Regular Customer</span>
-                      </span>
-                    ) : (
-                      <div className="text-xs text-brand-gray font-medium max-w-[200px] mx-auto sm:mx-0">
-                        {customer.totalGallons} / 50 gallons for Loyal Status
-                        <div className="w-full h-2 bg-[#f0f3f8] rounded-full mt-1.5 overflow-hidden shadow-inner">
-                          <div className="h-full bg-gradient-to-r from-brand-blue to-brand-teal transition-all duration-1000" style={{ width: `${Math.min(100, (customer.totalGallons / 50) * 100)}%` }} />
-                        </div>
+                    <div>
+                      <h2 className="font-heading font-black text-2xl">Customer Support</h2>
+                      <p className="text-white/80 text-xs sm:text-sm">We are here to assist with your water orders, deliveries, and inquiries.</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 pt-6 border-t border-white/20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="text-xs uppercase font-bold text-white/70 tracking-wider">Official Support Email</div>
+                      <div className="font-bold text-lg mt-0.5">aquagel.station@gmail.com</div>
+                    </div>
+                    <a
+                      href={`mailto:aquagel.station@gmail.com?subject=AquaGel%20Support%20Request%20-%20${encodeURIComponent(customer.name)}&body=Hello%20Aqua%20Gel%20Support%20Team,%0D%0A%0D%0AMy%20Order%20ID:%20%0D%0AMy%20Account%20Name:%20${encodeURIComponent(customer.name)}%0D%0AContact%20Number:%20${encodeURIComponent(customer.phone || '')}%0D%0A%0D%0AIssue%20/%20Concern:%0D%0A`}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-[#0a6ed1] font-black text-sm hover:bg-slate-50 active:scale-95 transition-all shadow-md hover:shadow-lg"
+                    >
+                      <Mail size={18} /> Send Support Email
+                    </a>
+                  </div>
+                </div>
+
+                {/* Instructions for Faster Assistance */}
+                <div className="bg-amber-50 border border-amber-200 p-5 sm:p-6 rounded-3xl">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-200/70 text-amber-900 flex items-center justify-center shrink-0 font-black text-sm">
+                      💡
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-heading font-bold text-base text-amber-950 mb-1">
+                        Instructions for Faster Assistance
+                      </h3>
+                      <p className="text-xs sm:text-sm text-amber-900/90 leading-relaxed">
+                        When emailing our support team, please make sure to include your <strong>Order ID</strong> and your <strong>Full Name</strong>. This helps our staff immediately locate your delivery records or payment logs for immediate assistance.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-amber-800">
+                        <span className="bg-white/80 px-2.5 py-1 rounded-lg border border-amber-200">✓ Address corrections</span>
+                        <span className="bg-white/80 px-2.5 py-1 rounded-lg border border-amber-200">✓ Order cancellations</span>
+                        <span className="bg-white/80 px-2.5 py-1 rounded-lg border border-amber-200">✓ Container return pickup</span>
                       </div>
-                    )
-                  )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Station Information & Operating Hours */}
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-brand-border shadow-sm">
+                  <h3 className="font-heading font-bold text-lg text-brand-dark mb-4 flex items-center gap-2">
+                    <Clock size={18} className="text-brand-blue" /> Operating Hours & Station Info
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div className="p-4 rounded-2xl bg-[#f4f7fb]">
+                      <div className="text-xs font-bold text-brand-gray uppercase tracking-wider mb-1">Station Hours</div>
+                      <div className="font-bold text-brand-dark">Monday – Sunday</div>
+                      <div className="text-brand-blue font-semibold text-xs mt-0.5">7:00 AM – 6:00 PM (Daily Refills)</div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-[#f4f7fb]">
+                      <div className="text-xs font-bold text-brand-gray uppercase tracking-wider mb-1">Hotline / Phone</div>
+                      <div className="font-bold text-brand-dark">+63 912 345 6789</div>
+                      <div className="text-brand-gray text-xs mt-0.5">Direct station dispatch contact</div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-[#f4f7fb] sm:col-span-2">
+                      <div className="text-xs font-bold text-brand-gray uppercase tracking-wider mb-1">Refilling Station Address</div>
+                      <div className="font-bold text-brand-dark">Aqua Gel Water Station, Main Highway Corner Waterway St.</div>
+                      <div className="text-brand-gray text-xs mt-0.5">Open for walk-in gallon refilling and empty container exchanges.</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* About Aqua Gel Water Station */}
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-brand-border shadow-sm">
+                  <h3 className="font-heading font-bold text-lg text-brand-dark mb-4 flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-brand-green" /> About Aqua Gel Water Station
+                  </h3>
+                  <p className="text-xs sm:text-sm text-brand-gray leading-relaxed mb-4">
+                    Aqua Gel Water Station is committed to delivering pure, crystal-clear, safe, and mineral-balanced drinking water to households and businesses. Our modern multi-barrier filtration system combines sediment filters, carbon absorption, reverse osmosis, and ultraviolet sterilization to ensure the highest health and safety standards.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                    <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
+                      <div className="text-2xl mb-1">🔬</div>
+                      <div className="font-bold text-xs text-brand-dark">21-Stage Purification</div>
+                      <div className="text-[10px] text-brand-gray mt-0.5">Reverse osmosis & UV sterilized</div>
+                    </div>
+                    <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
+                      <div className="text-2xl mb-1">🧼</div>
+                      <div className="font-bold text-xs text-brand-dark">Sterile Sanitization</div>
+                      <div className="text-[10px] text-brand-gray mt-0.5">High-pressure sanitized & sealed</div>
+                    </div>
+                    <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
+                      <div className="text-2xl mb-1">⭐</div>
+                      <div className="font-bold text-xs text-brand-dark">Loyalty Perks</div>
+                      <div className="text-[10px] text-brand-gray mt-0.5">2% lifetime discount after 50 gals</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div className="space-y-4 sm:space-y-6">
-                <div className="flex gap-4 p-4 rounded-2xl bg-[#f4f7fb]">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-brand-gray shrink-0 shadow-sm"><Phone size={18} /></div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 shadow-sm">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-6 mb-8 pb-8 border-b border-brand-border">
+                  {customer.profilePictureUrl ? (
+                    <img src={customer.profilePictureUrl} alt="Profile" className="w-20 h-20 rounded-2xl shadow-lg shrink-0 object-cover" />
+                  ) : (
+                    <div className="w-20 h-20 bg-gradient-to-br from-[#00a896] to-[#0a6ed1] rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg shrink-0">
+                      {customer.name[0]}
+                    </div>
+                  )}
                   <div className="flex-1">
-                    <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Phone Number</div>
+                    <h2 className="font-heading font-bold text-2xl text-brand-dark mb-1 flex items-center justify-center sm:justify-start gap-2">
+                      {customer.name}
+                      {customer.isLoyal && <span title="Loyal / Regular Customer" className="text-yellow-400 drop-shadow-sm text-xl lg:text-2xl">⭐</span>}
+                    </h2>
+                    <div className="text-brand-gray font-medium mb-3">@{customer.username}</div>
                     {isEditingProfile ? (
-                      <input 
-                        type="text" 
-                        className="form-control text-sm py-2 w-full"
-                        value={editPhone}
-                        onChange={e => setEditPhone(e.target.value)}
-                        placeholder="e.g. 09123456789"
-                      />
+                      <div className="mt-4">
+                        <label className="block text-xs font-semibold text-brand-gray uppercase tracking-wider mb-2 text-left">Upload Profile Picture (Optional)</label>
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          className="form-control text-sm py-2 mb-4 w-full file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-blue/10 file:text-brand-blue hover:file:bg-brand-blue/20"
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setEditProfilePicUrl(reader.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </div>
                     ) : (
-                      <div className="font-medium text-brand-dark text-base">{customer.phone || 'Not provided'}</div>
+                      customer.isLoyal ? (
+                        <span className="badge py-1 px-3 bg-gradient-to-r from-yellow-100 to-amber-50 text-yellow-800 border border-yellow-300 shadow-sm flex items-center gap-1.5 w-fit mx-auto sm:mx-0">
+                          ⭐ <span className="font-bold">Loyal / Regular Customer</span>
+                        </span>
+                      ) : (
+                        <div className="text-xs text-brand-gray font-medium max-w-[200px] mx-auto sm:mx-0">
+                          {customer.totalGallons} / 50 gallons for Loyal Status
+                          <div className="w-full h-2 bg-[#f0f3f8] rounded-full mt-1.5 overflow-hidden shadow-inner">
+                            <div className="h-full bg-gradient-to-r from-brand-blue to-brand-teal transition-all duration-1000" style={{ width: `${Math.min(100, (customer.totalGallons / 50) * 100)}%` }} />
+                          </div>
+                        </div>
+                      )
                     )}
                   </div>
                 </div>
 
-                <div className="flex gap-4 p-4 rounded-2xl bg-[#f4f7fb]">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-brand-gray shrink-0 shadow-sm"><MapPin size={18} /></div>
-                  <div className="flex-1">
-                    <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Delivery Address</div>
-                    {isEditingProfile ? (
-                      <textarea 
-                        className="form-control text-sm py-2 w-full"
-                        value={editAddress}
-                        onChange={e => setEditAddress(e.target.value)}
-                        placeholder="Enter your full address"
-                        rows={2}
-                      />
-                    ) : (
-                      <div className="font-medium text-brand-dark text-base">{customer.address || 'Not provided'}</div>
-                    )}
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="flex gap-4 p-4 rounded-2xl bg-[#f4f7fb]">
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-brand-gray shrink-0 shadow-sm"><Phone size={18} /></div>
+                    <div className="flex-1">
+                      <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Phone Number</div>
+                      {isEditingProfile ? (
+                        <input 
+                          type="text" 
+                          className="form-control text-sm py-2 w-full"
+                          value={editPhone}
+                          onChange={e => setEditPhone(e.target.value)}
+                          placeholder="e.g. 09123456789"
+                        />
+                      ) : (
+                        <div className="font-medium text-brand-dark text-base">{customer.phone || 'Not provided'}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 p-4 rounded-2xl bg-[#f4f7fb]">
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-brand-gray shrink-0 shadow-sm"><MapPin size={18} /></div>
+                    <div className="flex-1">
+                      <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Delivery Address</div>
+                      {isEditingProfile ? (
+                        <textarea 
+                          className="form-control text-sm py-2 w-full"
+                          value={editAddress}
+                          onChange={e => setEditAddress(e.target.value)}
+                          placeholder="Enter your full address"
+                          rows={2}
+                        />
+                      ) : (
+                        <div className="font-medium text-brand-dark text-base">{customer.address || 'Not provided'}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {isEditingProfile && (
+                    <div className="flex gap-3 pt-4">
+                      <button onClick={handleEditProfileSave} className="btn btn-primary flex-1">Save Profile</button>
+                      <button onClick={() => setIsEditingProfile(false)} className="btn btn-secondary flex-1">Cancel</button>
+                    </div>
+                  )}
+
+                  <div className={`flex gap-4 p-5 rounded-2xl ${customer.unpaid > 0 ? 'bg-[#fff0f0] border border-[#ffcdd2]' : 'bg-[#e8f5e9] border border-[#a5d6a7]'}`}>
+                    <div className={`w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm ${customer.unpaid > 0 ? 'text-[#e53935]' : 'text-[#2e7d32]'}`}>
+                      <span className="font-heading font-bold text-xl">₱</span>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Unpaid Balance</div>
+                      <div className={`font-heading font-bold text-3xl ${customer.unpaid > 0 ? 'text-[#e53935]' : 'text-[#2e7d32]'}`}>
+                        ₱{customer.unpaid}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer Support Shortcut Card */}
+                  <div className="mt-6 p-5 bg-[#e8f3ff] rounded-2xl border border-brand-blue/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="font-bold text-brand-blue text-sm">Need Help with Your Orders?</div>
+                      <div className="text-xs text-brand-gray mt-0.5">Reach out to our customer care team via email or phone.</div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setProfileSubTab('support')}
+                      className="btn btn-sm bg-brand-blue text-white hover:bg-brand-blue-dark text-xs font-bold px-4 py-2 rounded-xl shrink-0 shadow-xs"
+                    >
+                      Customer Support →
+                    </button>
                   </div>
                 </div>
 
-                {isEditingProfile && (
-                  <div className="flex gap-3 pt-4">
-                    <button onClick={handleEditProfileSave} className="btn btn-primary flex-1">Save Profile</button>
-                    <button onClick={() => setIsEditingProfile(false)} className="btn btn-secondary flex-1">Cancel</button>
+                {myOrders.length > 0 && (
+                  <div className="mt-8 pt-8 border-t border-brand-border">
+                    <h3 className="font-heading font-bold text-lg text-brand-dark mb-4 drop-shadow-sm">Recent Purchases</h3>
+                    <div className="space-y-3">
+                      {myOrders.slice(0, 3).map(o => (
+                        <div key={o.id} className="flex justify-between items-center bg-[#f4f7fb] p-4 rounded-2xl border border-transparent hover:border-brand-border transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-lg">
+                              {o.type === 'slim' ? '🔵' : '🟢'}
+                            </div>
+                            <div>
+                              <div className="font-bold text-brand-dark text-sm">{o.type === 'slim' ? 'Slim Gallon' : 'Round Gallon'} <span className="text-brand-gray font-normal">× {o.qty}</span></div>
+                              <div className="text-xs text-brand-gray">{new Date(o.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-brand-dark text-sm">₱{o.total}</div>
+                            <div className={`text-[10px] uppercase font-bold tracking-wider ${o.status === 'Delivered' ? 'text-brand-green' : o.status === 'Pending' ? 'text-brand-amber' : 'text-brand-blue'}`}>{o.status}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {myOrders.length > 3 && (
+                      <button onClick={() => setTab('myorders')} className="w-full mt-4 py-3 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5 rounded-xl transition-colors">
+                        View All Orders →
+                      </button>
+                    )}
                   </div>
                 )}
+              </div>
+            )}
+          </motion.div>
+        )}
 
-                <div className={`flex gap-4 p-5 rounded-2xl ${customer.unpaid > 0 ? 'bg-[#fff0f0] border border-[#ffcdd2]' : 'bg-[#e8f5e9] border border-[#a5d6a7]'}`}>
-                  <div className={`w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm ${customer.unpaid > 0 ? 'text-[#e53935]' : 'text-[#2e7d32]'}`}>
-                    <span className="font-heading font-bold text-xl">₱</span>
+        {tab === 'support' && (
+          <motion.div 
+            key="support-tab"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4 }}
+            className="max-w-xl"
+          >
+            <div className="mb-8">
+              <h1 className="font-heading text-3xl font-bold mb-2">Customer Support & About</h1>
+              <p className="text-brand-gray text-lg">Contact information, support guidance, and water station guidelines</p>
+            </div>
+
+            <div className="space-y-6">
+              {/* Direct Contact Card */}
+              <div className="bg-gradient-to-br from-[#0a6ed1] to-[#00a896] text-white p-6 sm:p-8 rounded-3xl shadow-md">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl">
+                    🎧
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Unpaid Balance</div>
-                    <div className={`font-heading font-bold text-3xl ${customer.unpaid > 0 ? 'text-[#e53935]' : 'text-[#2e7d32]'}`}>
-                      ₱{customer.unpaid}
+                    <h2 className="font-heading font-black text-2xl">Customer Support</h2>
+                    <p className="text-white/80 text-xs sm:text-sm">We are here to assist with your water orders, deliveries, and inquiries.</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-white/20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs uppercase font-bold text-white/70 tracking-wider">Official Support Email</div>
+                    <div className="font-bold text-lg mt-0.5">aquagel.station@gmail.com</div>
+                  </div>
+                  <a
+                    href={`mailto:aquagel.station@gmail.com?subject=AquaGel%20Support%20Request%20-%20${encodeURIComponent(customer?.name || 'Customer')}&body=Hello%20Aqua%20Gel%20Support%20Team,%0D%0A%0D%0AMy%20Order%20ID:%20%0D%0AMy%20Account%20Name:%20${encodeURIComponent(customer?.name || '')}%0D%0AContact%20Number:%20${encodeURIComponent(customer?.phone || '')}%0D%0A%0D%0AIssue%20/%20Concern:%0D%0A`}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white text-[#0a6ed1] font-black text-sm hover:bg-slate-50 active:scale-95 transition-all shadow-md hover:shadow-lg"
+                  >
+                    <Mail size={18} /> Send Support Email
+                  </a>
+                </div>
+              </div>
+
+              {/* Instructions for Faster Assistance */}
+              <div className="bg-amber-50 border border-amber-200 p-5 sm:p-6 rounded-3xl">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-amber-200/70 text-amber-900 flex items-center justify-center shrink-0 font-black text-sm">
+                    💡
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-heading font-bold text-base text-amber-950 mb-1">
+                      Instructions for Faster Assistance
+                    </h3>
+                    <p className="text-xs sm:text-sm text-amber-900/90 leading-relaxed">
+                      When emailing our support team, please make sure to include your <strong>Order ID</strong> and your <strong>Full Name</strong>. This helps our staff immediately locate your delivery records or payment logs for immediate assistance.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-amber-800">
+                      <span className="bg-white/80 px-2.5 py-1 rounded-lg border border-amber-200">✓ Address corrections</span>
+                      <span className="bg-white/80 px-2.5 py-1 rounded-lg border border-amber-200">✓ Order cancellations</span>
+                      <span className="bg-white/80 px-2.5 py-1 rounded-lg border border-amber-200">✓ Container return pickup</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {myOrders.length > 0 && (
-                <div className="mt-8 pt-8 border-t border-brand-border">
-                  <h3 className="font-heading font-bold text-lg text-brand-dark mb-4 drop-shadow-sm">Recent Purchases</h3>
-                  <div className="space-y-3">
-                    {myOrders.slice(0, 3).map(o => (
-                      <div key={o.id} className="flex justify-between items-center bg-[#f4f7fb] p-4 rounded-2xl border border-transparent hover:border-brand-border transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-lg">
-                            {o.type === 'slim' ? '🔵' : '🟢'}
-                          </div>
-                          <div>
-                            <div className="font-bold text-brand-dark text-sm">{o.type === 'slim' ? 'Slim Gallon' : 'Round Gallon'} <span className="text-brand-gray font-normal">× {o.qty}</span></div>
-                            <div className="text-xs text-brand-gray">{new Date(o.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-brand-dark text-sm">₱{o.total}</div>
-                          <div className={`text-[10px] uppercase font-bold tracking-wider ${o.status === 'Delivered' ? 'text-brand-green' : o.status === 'Pending' ? 'text-brand-amber' : 'text-brand-blue'}`}>{o.status}</div>
-                        </div>
-                      </div>
-                    ))}
+              {/* Station Information & Operating Hours */}
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-brand-border shadow-sm">
+                <h3 className="font-heading font-bold text-lg text-brand-dark mb-4 flex items-center gap-2">
+                  <Clock size={18} className="text-brand-blue" /> Operating Hours & Station Info
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div className="p-4 rounded-2xl bg-[#f4f7fb]">
+                    <div className="text-xs font-bold text-brand-gray uppercase tracking-wider mb-1">Station Hours</div>
+                    <div className="font-bold text-brand-dark">Monday – Sunday</div>
+                    <div className="text-brand-blue font-semibold text-xs mt-0.5">7:00 AM – 6:00 PM (Daily Refills)</div>
                   </div>
-                  {myOrders.length > 3 && (
-                    <button onClick={() => setTab('myorders')} className="w-full mt-4 py-3 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5 rounded-xl transition-colors">
-                      View All Orders →
-                    </button>
-                  )}
+                  <div className="p-4 rounded-2xl bg-[#f4f7fb]">
+                    <div className="text-xs font-bold text-brand-gray uppercase tracking-wider mb-1">Hotline / Phone</div>
+                    <div className="font-bold text-brand-dark">+63 912 345 6789</div>
+                    <div className="text-brand-gray text-xs mt-0.5">Direct station dispatch contact</div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-[#f4f7fb] sm:col-span-2">
+                    <div className="text-xs font-bold text-brand-gray uppercase tracking-wider mb-1">Refilling Station Address</div>
+                    <div className="font-bold text-brand-dark">Aqua Gel Water Station, Main Highway Corner Waterway St.</div>
+                    <div className="text-brand-gray text-xs mt-0.5">Open for walk-in gallon refilling and empty container exchanges.</div>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* About Aqua Gel Water Station */}
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-brand-border shadow-sm">
+                <h3 className="font-heading font-bold text-lg text-brand-dark mb-4 flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-brand-green" /> About Aqua Gel Water Station
+                </h3>
+                <p className="text-xs sm:text-sm text-brand-gray leading-relaxed mb-4">
+                  Aqua Gel Water Station is committed to delivering pure, crystal-clear, safe, and mineral-balanced drinking water to households and businesses. Our modern multi-barrier filtration system combines sediment filters, carbon absorption, reverse osmosis, and ultraviolet sterilization to ensure the highest health and safety standards.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
+                    <div className="text-2xl mb-1">🔬</div>
+                    <div className="font-bold text-xs text-brand-dark">21-Stage Purification</div>
+                    <div className="text-[10px] text-brand-gray mt-0.5">Reverse osmosis & UV sterilized</div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
+                    <div className="text-2xl mb-1">🧼</div>
+                    <div className="font-bold text-xs text-brand-dark">Sterile Sanitization</div>
+                    <div className="text-[10px] text-brand-gray mt-0.5">High-pressure sanitized & sealed</div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-brand-border/80 text-center">
+                    <div className="text-2xl mb-1">⭐</div>
+                    <div className="font-bold text-xs text-brand-dark">Loyalty Perks</div>
+                    <div className="text-[10px] text-brand-gray mt-0.5">2% lifetime discount after 50 gals</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
     </main>
+
+    {/* Cancellation Confirmation Modal */}
+    {cancelModalData && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center text-2xl mx-auto mb-4">
+            ⚠️
+          </div>
+          <h3 className="font-heading text-xl font-black text-center text-brand-dark mb-2">
+            {cancelModalData.title}
+          </h3>
+          <p className="text-xs sm:text-sm text-brand-gray text-center mb-6 leading-relaxed">
+            {cancelModalData.description}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setCancelModalData(null)}
+              className="w-full py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+            >
+              Keep Order
+            </button>
+            <button
+              type="button"
+              onClick={handleExecuteCancel}
+              className="w-full py-3 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md hover:shadow-lg transition-colors"
+            >
+              Confirm Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Reactivation Modal */}
+    {reactivateModalOrder && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl border border-brand-border p-6 sm:p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="w-14 h-14 rounded-2xl bg-blue-100 text-brand-blue flex items-center justify-center text-2xl mx-auto mb-4">
+            🔄
+          </div>
+          <h3 className="font-heading text-xl font-black text-center text-brand-dark mb-1">
+            Reactivate / Re-order
+          </h3>
+          <p className="text-xs text-brand-gray text-center mb-6">
+            Would you like to instantly re-order with the previous details or review them in the order form first?
+          </p>
+
+          {/* Order Summary Details */}
+          <div className="p-4 bg-[#f4f7fb] rounded-2xl mb-6 space-y-2 text-xs">
+            <div className="flex justify-between font-bold text-brand-dark">
+              <span>Gallon Type:</span>
+              <span>{reactivateModalOrder.type === 'slim' ? '🔵 Slim Gallon' : '🟢 Round Gallon'} × {reactivateModalOrder.qty}</span>
+            </div>
+            <div className="flex justify-between text-brand-gray">
+              <span>Method:</span>
+              <span>{reactivateModalOrder.method === 'delivery' ? '🚚 Delivery' : '🏪 Pick-up'}</span>
+            </div>
+            {reactivateModalOrder.address && (
+              <div className="flex justify-between text-brand-gray">
+                <span>Address:</span>
+                <span className="truncate max-w-[180px]">{reactivateModalOrder.address}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-brand-dark font-black pt-2 border-t border-brand-border/60 text-sm">
+              <span>Estimated Total:</span>
+              <span className="text-brand-blue">
+                ₱{formatCurrency(
+                  reactivateModalOrder.qty * getUnitPrice(reactivateModalOrder.type) * (customer?.isLoyal ? 0.98 : 1)
+                )}
+                {customer?.isLoyal && <span className="text-[10px] text-brand-green ml-1 font-semibold">(2% Loyal Discount)</span>}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={handleConfirmReactivateDirect}
+              className="w-full py-3.5 rounded-full bg-brand-blue hover:bg-brand-blue-dark text-white font-black text-xs shadow-md hover:shadow-lg transition-all"
+            >
+              ⚡ Instant Re-order (Place Order Now)
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmReactivateToCart}
+              className="w-full py-3 rounded-full bg-blue-50 hover:bg-blue-100 text-brand-blue font-bold text-xs transition-colors"
+            >
+              ✏️ Review in Order Form
+            </button>
+            <button
+              type="button"
+              onClick={() => setReactivateModalOrder(null)}
+              className="w-full py-2.5 text-xs text-brand-gray hover:text-brand-dark font-semibold transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* Success Notification */}
       <AnimatePresence>
         {orderSuccess && (
