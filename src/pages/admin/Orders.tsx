@@ -897,7 +897,7 @@ export default function Orders() {
                 {walkInDiscountAmount > 0 && (
                   <div className="mt-2 text-xs text-brand-green font-bold flex justify-between">
                     <span>Discount Deduction:</span>
-                    <span>-₱{walkInDiscountAmount.toFixed(2)} {walkInDiscountType === 'percentage' ? `(${walkInDiscountVal}%)` : ''}</span>
+                    <span>-₱{formatCurrency(walkInDiscountAmount)} {walkInDiscountType === 'percentage' ? `(${walkInDiscountVal}%)` : ''}</span>
                   </div>
                 )}
               </div>
@@ -905,9 +905,9 @@ export default function Orders() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Final Total</label>
                 <div className="w-full rounded-full border-[2px] border-slate-300 py-3 text-center text-lg font-black text-slate-850 bg-slate-50 shadow-inner">
-                  ₱{walkInFinalTotal.toFixed(2)}
+                  ₱{formatCurrency(walkInFinalTotal)}
                   {walkInDiscountAmount > 0 && (
-                    <span className="text-xs font-normal text-slate-400 line-through ml-2">₱{walkInSubtotal.toFixed(2)}</span>
+                    <span className="text-xs font-normal text-slate-400 line-through ml-2">₱{formatCurrency(walkInSubtotal)}</span>
                   )}
                 </div>
               </div>
@@ -1062,17 +1062,17 @@ export default function Orders() {
                 </div>
                 <div className="mt-2 text-xs flex justify-between font-bold text-slate-700">
                   <span>Subtotal:</span>
-                  <span>₱{editSubtotal.toFixed(2)}</span>
+                  <span>₱{formatCurrency(editSubtotal)}</span>
                 </div>
                 {editDiscountAmount > 0 && (
                   <div className="mt-1 text-xs text-brand-green font-bold flex justify-between">
                     <span>Discount:</span>
-                    <span>-₱{editDiscountAmount.toFixed(2)} {eDiscountType === 'percentage' ? `(${eDiscountVal}%)` : ''}</span>
+                    <span>-₱{formatCurrency(editDiscountAmount)} {eDiscountType === 'percentage' ? `(${eDiscountVal}%)` : ''}</span>
                   </div>
                 )}
                 <div className="mt-2 pt-2 border-t border-slate-200 text-sm font-black text-slate-900 flex justify-between">
                   <span>Updated Total:</span>
-                  <span>₱{editFinalTotal.toFixed(2)}</span>
+                  <span>₱{formatCurrency(editFinalTotal)}</span>
                 </div>
               </div>
 

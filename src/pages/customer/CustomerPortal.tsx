@@ -350,7 +350,7 @@ export default function CustomerPortal() {
       setSubscriptions([newSub, ...subscriptions]);
       setOrderSuccess(successMsg);
     } else {
-      setOrderSuccess(`✅ Order placed successfully! Total: ₱${total}. Status: Pending.`);
+      setOrderSuccess(`✅ Order placed successfully! Total: ₱${formatCurrency(total)}. Status: Pending.`);
     }
 
     setQty(1);
@@ -593,7 +593,7 @@ export default function CustomerPortal() {
                     <div className="text-sm text-brand-gray">Please settle your unpaid balance</div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className="font-heading text-3xl font-black text-[#e53935]">₱{customer.unpaid}</div>
+                    <div className="font-heading text-3xl font-black text-[#e53935]">₱{formatCurrency(customer.unpaid)}</div>
                     <button 
                       onClick={payOutstandingBalance}
                       disabled={isProcessingPayment}
@@ -625,8 +625,8 @@ export default function CustomerPortal() {
                            <div className="text-brand-blue font-black mt-1">
                             {getUnitPrice('slim') < inventory.priceSlim ? (
                               <div className="flex flex-col items-center">
-                                <span className="line-through text-brand-gray text-xs">₱{inventory.priceSlim}</span>
-                                <span>₱{getUnitPrice('slim')}</span>
+                                <span className="line-through text-brand-gray text-xs">₱{formatCurrency(inventory.priceSlim)}</span>
+                                <span>₱{formatCurrency(getUnitPrice('slim'))}</span>
                                 {inventory.discountSlimValidUntil && (
                                   <span className="text-[10px] text-amber-700 font-semibold mt-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                                     Valid until {new Date(inventory.discountSlimValidUntil).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -634,7 +634,7 @@ export default function CustomerPortal() {
                                 )}
                               </div>
                             ) : (
-                              <span>₱{inventory.priceSlim}</span>
+                              <span>₱{formatCurrency(inventory.priceSlim)}</span>
                             )}
                           </div>
                           <div className="text-[11px] text-brand-gray mt-1 font-medium">{inventory.slim} available</div>
@@ -656,8 +656,8 @@ export default function CustomerPortal() {
                           <div className="text-brand-blue font-black mt-1">
                             {getUnitPrice('round') < inventory.priceRound ? (
                               <div className="flex flex-col items-center">
-                                <span className="line-through text-brand-gray text-xs">₱{inventory.priceRound}</span>
-                                <span>₱{getUnitPrice('round')}</span>
+                                <span className="line-through text-brand-gray text-xs">₱{formatCurrency(inventory.priceRound)}</span>
+                                <span>₱{formatCurrency(getUnitPrice('round'))}</span>
                                 {inventory.discountRoundValidUntil && (
                                   <span className="text-[10px] text-amber-700 font-semibold mt-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                                     Valid until {new Date(inventory.discountRoundValidUntil).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -665,7 +665,7 @@ export default function CustomerPortal() {
                                 )}
                               </div>
                             ) : (
-                              <span>₱{inventory.priceRound}</span>
+                              <span>₱{formatCurrency(inventory.priceRound)}</span>
                             )}
                           </div>
                           <div className="text-[11px] text-brand-gray mt-1 font-medium">{inventory.round} available</div>
@@ -707,7 +707,7 @@ export default function CustomerPortal() {
                       >+</button>
                     </div>
                     <div className="text-sm text-brand-gray font-medium">
-                      Total: <span className="font-bold text-brand-blue text-lg ml-1">₱{total}</span>
+                      Total: <span className="font-bold text-brand-blue text-lg ml-1">₱{formatCurrency(total)}</span>
                     </div>
                   </div>
                 </div>
@@ -1210,7 +1210,7 @@ export default function CustomerPortal() {
                 <div>
                   <div className="text-xs font-bold text-brand-gray uppercase tracking-wider">Total Paid</div>
                   <div className="text-2xl font-black text-brand-dark">
-                    ₱{myOrders.filter(o => o.paid).reduce((sum, o) => sum + o.total, 0)}
+                    ₱{formatCurrency(myOrders.filter(o => o.paid).reduce((sum, o) => sum + o.total, 0))}
                   </div>
                 </div>
               </div>
@@ -1222,7 +1222,7 @@ export default function CustomerPortal() {
                 <div>
                   <div className="text-xs font-bold text-brand-gray uppercase tracking-wider">Outstanding Balance</div>
                   <div className={`text-2xl font-black ${customer && customer.unpaid > 0 ? 'text-[#e53935]' : 'text-brand-dark'}`}>
-                    ₱{customer?.unpaid || 0}
+                    ₱{formatCurrency(customer?.unpaid || 0)}
                   </div>
                 </div>
               </div>
@@ -1295,7 +1295,7 @@ export default function CustomerPortal() {
 
                       <div className="sm:text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end border-t sm:border-t-0 pt-3 sm:pt-0 border-brand-border">
                         <div className="font-heading font-black text-lg sm:text-xl text-brand-dark">
-                          ₱{o.total}
+                          ₱{formatCurrency(o.total)}
                         </div>
                         <span className={`text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                           o.paid 
@@ -1449,6 +1449,19 @@ export default function CustomerPortal() {
                       <div className="text-[10px] text-brand-gray mt-0.5">High-pressure sanitized & sealed</div>
                     </div>
                   </div>
+
+                  {/* Promotional Announcement Notice */}
+                  <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/90 flex items-center gap-3.5 shadow-xs">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl shrink-0 shadow-xs">
+                      🎁
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase font-black text-amber-800 tracking-wider">Promotional Announcement</div>
+                      <div className="text-xs sm:text-sm font-bold text-amber-950 mt-0.5">
+                        Get a surprise gift every December after 50 gallons.
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1554,7 +1567,7 @@ export default function CustomerPortal() {
                     <div>
                       <div className="text-xs font-semibold text-brand-gray uppercase tracking-wider mb-1">Unpaid Balance</div>
                       <div className={`font-heading font-bold text-3xl ${customer.unpaid > 0 ? 'text-[#e53935]' : 'text-[#2e7d32]'}`}>
-                        ₱{customer.unpaid}
+                        ₱{formatCurrency(customer.unpaid)}
                       </div>
                     </div>
                   </div>
@@ -1591,7 +1604,7 @@ export default function CustomerPortal() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-bold text-brand-dark text-sm">₱{o.total}</div>
+                            <div className="font-bold text-brand-dark text-sm">₱{formatCurrency(o.total)}</div>
                             <div className={`text-[10px] uppercase font-bold tracking-wider ${o.status === 'Delivered' ? 'text-brand-green' : o.status === 'Pending' ? 'text-brand-amber' : 'text-brand-blue'}`}>{o.status}</div>
                           </div>
                         </div>
@@ -1714,6 +1727,19 @@ export default function CustomerPortal() {
                     <div className="text-2xl mb-1">🧼</div>
                     <div className="font-bold text-xs text-brand-dark">Sterile Sanitization</div>
                     <div className="text-[10px] text-brand-gray mt-0.5">High-pressure sanitized & sealed</div>
+                  </div>
+                </div>
+
+                {/* Promotional Announcement Notice */}
+                <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/90 flex items-center gap-3.5 shadow-xs">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl shrink-0 shadow-xs">
+                    🎁
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-black text-amber-800 tracking-wider">Promotional Announcement</div>
+                    <div className="text-xs sm:text-sm font-bold text-amber-950 mt-0.5">
+                      Get a surprise gift every December after 50 gallons.
+                    </div>
                   </div>
                 </div>
               </div>

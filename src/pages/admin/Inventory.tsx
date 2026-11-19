@@ -5,7 +5,7 @@ import { formatCurrency } from '../../lib/format';
 
 export default function Inventory() {
   const { inventory, setInventory, stockLog, setStockLog } = useStore();
-  
+
   const [slimPrice, setSlimPrice] = useState(inventory.priceSlim.toString());
   const [roundPrice, setRoundPrice] = useState(inventory.priceRound.toString());
   const [slimDiscount, setSlimDiscount] = useState(inventory.discountSlim?.toString() || '');
@@ -86,7 +86,7 @@ export default function Inventory() {
   const addStock = (type: 'slim' | 'round') => {
     const qty = parseInt(type === 'slim' ? slimAdd : roundAdd);
     if (!qty || qty <= 0 || isNaN(qty)) return;
-    
+
     setInventory({ ...inventory, [type]: inventory[type] + qty });
     logAction(`Added ${qty} ${type} gallons. New stock: ${inventory[type] + qty}`);
     showAlert('Stock updated successfully!');
@@ -96,7 +96,7 @@ export default function Inventory() {
   const setStock = (type: 'slim' | 'round') => {
     const qty = parseInt(type === 'slim' ? slimAdd : roundAdd);
     if (isNaN(qty) || qty < 0) return;
-    
+
     setInventory({ ...inventory, [type]: qty });
     logAction(`Set ${type} gallon stock to ${qty}`);
     showAlert('Stock updated!');
@@ -112,10 +112,10 @@ export default function Inventory() {
     const discountSExp = slimDiscountExp ? new Date(slimDiscountExp + 'T23:59:59').getTime() : undefined;
     const discountR = parseFloat(roundDiscount) || undefined;
     const discountRExp = roundDiscountExp ? new Date(roundDiscountExp + 'T23:59:59').getTime() : undefined;
-    
-    setInventory({ 
-      ...inventory, 
-      priceSlim: slim, 
+
+    setInventory({
+      ...inventory,
+      priceSlim: slim,
       priceRound: round,
       discountSlim: discountS,
       discountSlimValidUntil: discountSExp,
@@ -157,34 +157,34 @@ export default function Inventory() {
               <div className="text-sm text-brand-gray">₱{formatCurrency(inventory.priceSlim)} per gallon</div>
             </div>
           </div>
-          
+
           <div className={`font-heading text-6xl font-extrabold mb-4 leading-none ${inventory.slim < 10 ? 'text-brand-red' : inventory.slim < 20 ? 'text-brand-amber' : 'text-brand-blue'}`}>
             {inventory.slim}
           </div>
-          
+
           <div className="h-3 bg-brand-gray-light rounded-full overflow-hidden mb-2">
             <div className={`h-full rounded-full transition-all duration-300 ${slimColor}`} style={{ width: `${slimPct}%` }} />
           </div>
           <div className="text-xs text-brand-gray mb-6">
             {inventory.slim} / {maxSlim} gallons in stock
           </div>
-          
+
           {inventory.slim < 10 && (
             <div className="bg-brand-red-light text-brand-red px-3 py-2 rounded-lg text-xs font-semibold mb-4">
               ⚠️ Low stock! Restock soon.
             </div>
           )}
-          
+
           <div className="mt-auto flex gap-2">
-            <input 
-              type="number" 
-              className="form-control w-24 text-center py-2" 
-              placeholder="Qty" 
+            <input
+              type="number"
+              className="form-control w-24 text-center py-2"
+              placeholder="Qty"
               min="0"
               value={slimAdd}
               onChange={e => setSlimAdd(e.target.value)}
             />
-            <button className="btn btn-primary btn-sm flex-1" onClick={() => addStock('slim')}><Plus size={16}/> Add</button>
+            <button className="btn btn-primary btn-sm flex-1" onClick={() => addStock('slim')}><Plus size={16} /> Add</button>
             <button className="btn btn-secondary btn-sm flex-1" onClick={() => setStock('slim')}>Set Exact</button>
           </div>
         </div>
@@ -197,34 +197,34 @@ export default function Inventory() {
               <div className="text-sm text-brand-gray">₱{formatCurrency(inventory.priceRound)} per gallon</div>
             </div>
           </div>
-          
+
           <div className={`font-heading text-6xl font-extrabold mb-4 leading-none ${inventory.round < 10 ? 'text-brand-red' : inventory.round < 20 ? 'text-brand-amber' : 'text-brand-teal'}`}>
             {inventory.round}
           </div>
-          
+
           <div className="h-3 bg-brand-gray-light rounded-full overflow-hidden mb-2">
             <div className={`h-full rounded-full transition-all duration-300 ${roundColor}`} style={{ width: `${roundPct}%` }} />
           </div>
           <div className="text-xs text-brand-gray mb-6">
             {inventory.round} / {maxRound} gallons in stock
           </div>
-          
+
           {inventory.round < 10 && (
             <div className="bg-brand-red-light text-brand-red px-3 py-2 rounded-lg text-xs font-semibold mb-4">
               ⚠️ Low stock! Restock soon.
             </div>
           )}
-          
+
           <div className="mt-auto flex gap-2">
-            <input 
-              type="number" 
-              className="form-control w-24 text-center py-2" 
-              placeholder="Qty" 
+            <input
+              type="number"
+              className="form-control w-24 text-center py-2"
+              placeholder="Qty"
               min="0"
               value={roundAdd}
               onChange={e => setRoundAdd(e.target.value)}
             />
-            <button className="btn btn-primary btn-sm flex-1" onClick={() => addStock('round')}><Plus size={16}/> Add</button>
+            <button className="btn btn-primary btn-sm flex-1" onClick={() => addStock('round')}><Plus size={16} /> Add</button>
             <button className="btn btn-secondary btn-sm flex-1" onClick={() => setStock('round')}>Set Exact</button>
           </div>
         </div>
@@ -234,7 +234,7 @@ export default function Inventory() {
         <div className="flex flex-col gap-6">
           <div className="card !mb-0">
             <h2 className="card-title mb-6 flex items-center gap-2"><Package size={20} className="text-brand-blue" /> Base Pricing</h2>
-            
+
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="form-group !mb-0">
                 <label className="text-xs">Slim Gallon Price (₱)</label>
@@ -245,7 +245,7 @@ export default function Inventory() {
                 <input type="number" className="form-control py-1.5" min="1" value={roundPrice} onChange={e => setRoundPrice(e.target.value)} />
               </div>
             </div>
-            
+
             <button className="btn btn-primary w-full" onClick={savePricing}>Save Pricing</button>
           </div>
 
@@ -254,17 +254,17 @@ export default function Inventory() {
             <p className="text-xs text-brand-gray mb-6">
               Discounts will be visible to customers until their exact expiration date. You can also manually remove them at any time to end promotions early.
             </p>
-            
+
             <div className="space-y-4 mb-6">
               <div className="p-4 bg-brand-gray-light rounded-xl border border-brand-border">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="font-bold text-brand-dark">Slim Gallons</h3>
-                  <button 
-                    onClick={() => { 
-                      setSlimDiscount(''); 
-                      setSlimDiscountExp(''); 
+                  <button
+                    onClick={() => {
+                      setSlimDiscount('');
+                      setSlimDiscountExp('');
                       setSlimPctSelect('');
-                    }} 
+                    }}
                     className="text-xs font-semibold text-brand-red hover:underline"
                   >
                     Remove Discount
@@ -275,7 +275,7 @@ export default function Inventory() {
                   <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 block">
                     Select Discount (1% to 50%)
                   </label>
-                  <select 
+                  <select
                     className="form-control text-xs py-2 px-3 w-full bg-white font-medium border-brand-border focus:border-brand-blue"
                     value={slimPctSelect}
                     onChange={e => handleSlimPctChange(e.target.value)}
@@ -283,7 +283,7 @@ export default function Inventory() {
                     <option value="">-- Choose Discount Percentage (1% - 50%) --</option>
                     {discountPercentages.map(pct => (
                       <option key={pct} value={pct}>
-                        {pct}% Off (₱{(parseFloat(slimPrice || '0') * (1 - pct/100)).toFixed(2)})
+                        {pct}% Off (₱{formatCurrency(parseFloat(slimPrice || '0') * (1 - pct / 100))})
                       </option>
                     ))}
                   </select>
@@ -304,12 +304,12 @@ export default function Inventory() {
               <div className="p-4 bg-brand-gray-light rounded-xl border border-brand-border">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="font-bold text-brand-dark">Round Gallons</h3>
-                  <button 
-                    onClick={() => { 
-                      setRoundDiscount(''); 
-                      setRoundDiscountExp(''); 
+                  <button
+                    onClick={() => {
+                      setRoundDiscount('');
+                      setRoundDiscountExp('');
                       setRoundPctSelect('');
-                    }} 
+                    }}
                     className="text-xs font-semibold text-brand-red hover:underline"
                   >
                     Remove Discount
@@ -320,7 +320,7 @@ export default function Inventory() {
                   <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 block">
                     Select Discount (1% to 50%)
                   </label>
-                  <select 
+                  <select
                     className="form-control text-xs py-2 px-3 w-full bg-white font-medium border-brand-border focus:border-brand-blue"
                     value={roundPctSelect}
                     onChange={e => handleRoundPctChange(e.target.value)}
@@ -328,7 +328,7 @@ export default function Inventory() {
                     <option value="">-- Choose Discount Percentage (1% - 50%) --</option>
                     {discountPercentages.map(pct => (
                       <option key={pct} value={pct}>
-                        {pct}% Off (₱{(parseFloat(roundPrice || '0') * (1 - pct/100)).toFixed(2)})
+                        {pct}% Off (₱{formatCurrency(parseFloat(roundPrice || '0') * (1 - pct / 100))})
                       </option>
                     ))}
                   </select>
@@ -346,7 +346,7 @@ export default function Inventory() {
                 </div>
               </div>
             </div>
-            
+
             <button className="btn btn-secondary w-full bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/20" onClick={savePricing}>Save Discounts</button>
           </div>
         </div>
